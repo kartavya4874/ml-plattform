@@ -55,20 +55,7 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # ML Models and Data (Non-deployable)
-models/
-checkpoints/
-runs/
-tensorboard/
-data/
-datasets/
-*.csv
-*.tsv
-*.pt
-*.pth
-*.onnx
-*.h5
-*.pkl
-*.joblib
+
 *.npy
 *.npz
 *.sqlite
@@ -77,8 +64,6 @@ datasets/
 *.ipynb_checkpoints/
 
 # Docker
-docker-compose.override.yml
-.docker/
 
 # IDEs and Editors
 .vscode/
