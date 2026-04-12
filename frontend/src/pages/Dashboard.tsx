@@ -1,7 +1,10 @@
 import { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
-import { Box, Grid, Typography, Card, CardContent, Chip, LinearProgress } from '@mui/material'
+import {
+    Box, Grid, Typography, Card, CardContent, Chip, LinearProgress,
+    CircularProgress,
+} from '@mui/material'
 import {
     Storage as DataIcon,
     Psychology as TrainIcon,
@@ -14,6 +17,8 @@ import {
 import { fetchDatasets } from '../store/dataSlice'
 import { fetchJobs } from '../store/trainingSlice'
 import { fetchModels } from '../store/modelsSlice'
+import { fetchSubscription } from '../store/subscriptionSlice'
+import UpgradePrompt from '../components/UpgradePrompt'
 import type { AppDispatch, RootState } from '../store/store'
 
 const StatCard = ({ label, value, icon, color, sublabel }: { label: string; value: any; icon: React.ReactNode; color: string; sublabel?: string }) => (
@@ -59,6 +64,57 @@ const QuickActionCard = ({ icon, title, desc, color, onClick }: any) => (
     </Card>
 )
 
+function UsageGauge({ label, current, limit, color }: { label: string; current: number; limit: number; color: string }) {
+    const isUnlimited = limit >= 999_999
+    const pct = isUnlimited ? 5 : Math.min((current / limit) * 100, 100)
+    const displayLimit = isUnlimited ? '∞' : limit.toLocaleString()
+    const isWarning = !isUnlimited && pct >= 80
+    const gaugeColor = isWarning ? '#EF4444' : color
+
+    return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                <CircularProgress
+                    variant="determinate"
+                    value={100}
+                    size={72}
+                    thickness={4}
+                    sx={{ color: 'rgba(255,255,255,0.06)', position: 'absolute' }}
+                />
+                <CircularProgress
+                    variant="determinate"
+                    value={pct}
+                    size={72}
+                    thickness={4}
+                    sx={{
+                        color: gaugeColor,
+                        '& .MuiCircularProgress-circle': {
+                            strokeLinecap: 'round',
+                            transition: 'stroke-dashoffset 0.8s ease',
+                        },
+                    }}
+                />
+                <Box sx={{
+                    position: 'absolute', top: 0, left: 0, bottom: 0, right: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                    <Typography variant="caption" fontWeight={700} sx={{ color: gaugeColor, fontSize: 13 }}>
+                        {isUnlimited ? '∞' : Math.round(pct) + '%'}
+                    </Typography>
+                </Box>
+            </Box>
+            <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="caption" fontWeight={600} sx={{ display: 'block', fontSize: 11 }}>
+                    {label}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 10 }}>
+                    {current.toLocaleString()} / {displayLimit}
+                </Typography>
+            </Box>
+        </Box>
+    )
+}
+
 export default function Dashboard() {
     const dispatch = useDispatch<AppDispatch>()
     const navigate = useNavigate()
@@ -66,16 +122,19 @@ export default function Dashboard() {
     const { datasets } = useSelector((s: RootState) => s.data)
     const { jobs } = useSelector((s: RootState) => s.training)
     const { models } = useSelector((s: RootState) => s.models)
+    const { summary } = useSelector((s: RootState) => s.subscription)
 
     useEffect(() => {
         dispatch(fetchDatasets())
         dispatch(fetchJobs())
         dispatch(fetchModels())
+        dispatch(fetchSubscription())
     }, [dispatch])
 
     const runningJobs = jobs.filter(j => j.status === 'running').length
     const completedJobs = jobs.filter(j => j.status === 'completed').length
     const productionModels = models.filter(m => m.stage === 'production').length
+    const currentTier = summary?.tier || 'free'
 
     return (
         <Box className="fade-in">
@@ -102,6 +161,59 @@ export default function Dashboard() {
                     </Grid>
                 ))}
             </Grid>
+
+            {/* Usage & Quota */}
+            {summary && (
+                <Box mb={4}>
+                    <Typography variant="h6" fontWeight={700} mb={2}>Usage & Quota</Typography>
+                    <Card sx={{ borderRadius: '16px' }}>
+                        <CardContent sx={{ p: 3 }}>
+                            <Box sx={{
+                                display: 'flex', justifyContent: 'center', gap: 5,
+                                flexWrap: 'wrap', mb: 2,
+                            }}>
+                                <UsageGauge
+                                    label="Datasets"
+                                    current={summary.usage.datasets_created}
+                                    limit={summary.limits.datasets}
+                                    color="#6366F1"
+                                />
+                                <UsageGauge
+                                    label="Training Jobs"
+                                    current={summary.usage.training_jobs_run}
+                                    limit={summary.limits.training_jobs_per_month}
+                                    color="#10B981"
+                                />
+                                <UsageGauge
+                                    label="Models"
+                                    current={summary.usage.models_created}
+                                    limit={summary.limits.models}
+                                    color="#F59E0B"
+                                />
+                                <UsageGauge
+                                    label="Deployments"
+                                    current={summary.usage.deployments_active}
+                                    limit={summary.limits.deployments}
+                                    color="#EC4899"
+                                />
+                                <UsageGauge
+                                    label="Inferences"
+                                    current={summary.usage.inference_requests}
+                                    limit={summary.limits.inference_requests_per_month}
+                                    color="#3B82F6"
+                                />
+                            </Box>
+
+                            {/* Upgrade prompts */}
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
+                                <UpgradePrompt resource="datasets" current={summary.usage.datasets_created} limit={summary.limits.datasets} tier={currentTier} />
+                                <UpgradePrompt resource="training_jobs" current={summary.usage.training_jobs_run} limit={summary.limits.training_jobs_per_month} tier={currentTier} />
+                                <UpgradePrompt resource="inference_requests" current={summary.usage.inference_requests} limit={summary.limits.inference_requests_per_month} tier={currentTier} />
+                            </Box>
+                        </CardContent>
+                    </Card>
+                </Box>
+            )}
 
             {/* Quick Actions */}
             <Typography variant="h6" fontWeight={700} mb={2}>Quick Actions</Typography>

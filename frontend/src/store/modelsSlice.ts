@@ -5,6 +5,8 @@ export interface MLModel {
     id: string
     name: string
     description: string | null
+    is_public: boolean
+    collaborator_ids: string[]
     task_type: string
     framework: string
     stage: string

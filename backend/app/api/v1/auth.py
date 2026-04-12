@@ -2,7 +2,7 @@
 import uuid
 import time
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from slugify import slugify
 
@@ -12,9 +12,10 @@ from app.core.security import (
 )
 from app.models.models import User
 from app.schemas.schemas import (
-    UserRegister, UserLogin, TokenResponse, RefreshRequest, UserOut
+    UserRegister, UserLogin, TokenResponse, RefreshRequest, UserOut, UserUpdate, UserPasswordUpdate
 )
 from app.services.email_service import send_verification_email
+from app.services.storage_service import StorageService
 import redis.asyncio as aioredis
 from app.core.config import settings
 
@@ -25,17 +26,14 @@ bearer_scheme = HTTPBearer()
 
 
 async def get_redis():
-    """Yield a Redis client, or None if Redis is unavailable."""
+    """Return a Redis client, or None if Redis is unavailable."""
     try:
         r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
         await r.ping()  # verify connectivity
-        try:
-            yield r
-        finally:
-            await r.aclose()
+        return r
     except Exception:
         logger.warning("Redis is unavailable — token revocation features are disabled.")
-        yield None
+        return None
 
 
 async def get_current_user(
@@ -149,6 +147,76 @@ async def logout(
 async def me(current_user: User = Depends(get_current_user)):
     """Return the authenticated user's profile."""
     return current_user
+
+
+@router.put("/me", response_model=UserOut)
+async def update_me(body: UserUpdate, current_user: User = Depends(get_current_user)):
+    """Update authenticated user's profile."""
+    if body.full_name is not None:
+        current_user.full_name = body.full_name
+    if body.email is not None and body.email != current_user.email:
+        existing = await User.find_one(User.email == body.email)
+        if existing:
+            raise HTTPException(status_code=409, detail="Email already taken")
+        current_user.email = body.email
+    if body.username is not None and body.username != current_user.username:
+        existing_slug = await User.find_one(User.username == body.username)
+        if existing_slug:
+            raise HTTPException(status_code=409, detail="Username already taken")
+        current_user.username = body.username
+    if body.is_public is not None:
+        current_user.is_public = body.is_public
+    if body.bio is not None:
+        current_user.bio = body.bio
+    if body.website is not None:
+        current_user.website = body.website
+    if body.github_url is not None:
+        current_user.github_url = body.github_url
+    if body.kaggle_url is not None:
+        current_user.kaggle_url = body.kaggle_url
+    await current_user.save()
+    return current_user
+
+
+@router.post("/me/avatar", response_model=UserOut)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    storage: StorageService = Depends(StorageService.get_instance)
+):
+    """Upload and set user profile picture. Automatically uses Firebase if configured, falling back to Local/MinIO."""
+    allowed_mimes = {"image/jpeg", "image/png", "image/webp"}
+    if file.content_type not in allowed_mimes:
+        raise HTTPException(status_code=415, detail="Unsupported image format. Use JPEG, PNG, or WEBP.")
+    
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:  # 5MB limit
+        raise HTTPException(status_code=413, detail="Avatar exceeds 5MB limit")
+
+    ext = file.filename.split(".")[-1] if file.filename else "jpg"
+    object_name = f"{current_user.id}/avatar_{int(time.time())}.{ext}"
+    
+    await storage.upload_bytes(
+        bucket="avatars", 
+        object_name=object_name, 
+        data=content, 
+        content_type=file.content_type
+    )
+    
+    current_user.avatar_url = f"/api/v1/data/download/avatars/{object_name}"
+    await current_user.save()
+    return current_user
+
+
+@router.put("/me/password", status_code=200)
+async def update_my_password(body: UserPasswordUpdate, current_user: User = Depends(get_current_user)):
+    """Update authenticated user's password."""
+    if not verify_password(body.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Incorrect current password")
+    
+    current_user.hashed_password = hash_password(body.new_password)
+    await current_user.save()
+    return {"message": "Password updated successfully"}
 
 
 @router.get("/verify/{token}", status_code=200)

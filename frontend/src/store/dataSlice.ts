@@ -4,6 +4,9 @@ import { api } from '../api/client'
 export interface Dataset {
     id: string
     name: string
+    description: string | null
+    is_public: boolean
+    collaborator_ids: string[]
     dataset_type: string
     file_size_bytes: number
     row_count: number | null

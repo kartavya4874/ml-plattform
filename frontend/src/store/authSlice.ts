@@ -6,6 +6,15 @@ interface User {
     id: string
     email: string
     full_name: string | null
+    username: string | null
+    avatar_url: string | null
+    is_public: boolean
+    bio: string | null
+    website: string | null
+    github_url: string | null
+    kaggle_url: string | null
+    followers_count: number
+    following_count: number
     role: string
     is_verified: boolean
     slug: string

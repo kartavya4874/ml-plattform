@@ -10,6 +10,7 @@ from app.models.models import User, MLModel, ModelStage
 from app.schemas.schemas import PredictionRequest, PredictionResponse
 from app.api.v1.auth import get_current_user
 from app.services.inference_service import InferenceService
+from app.services.quota_service import check_quota, increment_usage
 
 router = APIRouter(prefix="/inference", tags=["Inference"])
 
@@ -34,6 +35,22 @@ async def get_input_schema(
     return model.input_schema or {}
 
 
+@router.get("/{model_id}/features")
+async def get_model_features(
+    model_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    svc: InferenceService = Depends(get_inference_service),
+):
+    """Return the feature names expected by this model for prediction."""
+    model_obj = await MLModel.find_one(MLModel.id == model_id, MLModel.owner_id == current_user.id)
+    if not model_obj:
+        raise HTTPException(status_code=404, detail="Model not found")
+    try:
+        return await svc.get_model_features(model_obj)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
 @router.post("/{model_id}/predict", response_model=PredictionResponse)
 async def predict(
     model_id: uuid.UUID,
@@ -42,6 +59,9 @@ async def predict(
     svc: InferenceService = Depends(get_inference_service),
 ):
     """Run a single prediction against a trained model."""
+    # Check inference quota
+    await check_quota(current_user.id, "inference_requests")
+
     model_obj = await MLModel.find_one(MLModel.id == model_id, MLModel.owner_id == current_user.id)
     if not model_obj:
         raise HTTPException(status_code=404, detail="Model not found")
@@ -53,6 +73,10 @@ async def predict(
         raise HTTPException(status_code=422, detail=f"Inference error: {str(exc)}") from exc
 
     latency_ms = (time.monotonic() - start) * 1000
+
+    # Track usage
+    await increment_usage(current_user.id, "inference_requests")
+
     return PredictionResponse(
         prediction=output.get("prediction"),
         confidence=output.get("confidence"),

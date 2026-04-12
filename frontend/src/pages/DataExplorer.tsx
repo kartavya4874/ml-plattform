@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
+import { useNavigate } from 'react-router-dom'
 import { useDropzone } from 'react-dropzone'
 import {
     Box, Typography, Card, Chip, LinearProgress,
@@ -13,8 +14,14 @@ import {
     TableChart as TableIcon,
     Image as ImageIcon,
     TextFields as TextIcon,
+    Visibility as ViewIcon,
+    BarChart as EdaIcon,
+    Build as TransformIcon,
+    Public as PublicIcon,
+    Lock as PrivateIcon,
 } from '@mui/icons-material'
 import { fetchDatasets, deleteDataset, uploadDataset } from '../store/dataSlice'
+import { api } from '../api/client'
 import type { AppDispatch, RootState } from '../store/store'
 
 const typeIcons: Record<string, React.ReactNode> = {
@@ -44,6 +51,7 @@ function formatBytes(bytes: number): string {
 
 export default function DataExplorer() {
     const dispatch = useDispatch<AppDispatch>()
+    const navigate = useNavigate()
     const { datasets, loading, uploading, error } = useSelector((s: RootState) => s.data)
     const [progress, setProgress] = useState(0)
 
@@ -126,7 +134,7 @@ export default function DataExplorer() {
                     <Table>
                         <TableHead>
                             <TableRow>
-                                {['Name', 'Type', 'Size', 'Rows', 'Columns', 'Quality', 'Status', 'Actions'].map(h => (
+                                {['Name', 'Type', 'Size', 'Rows', 'Quality', 'Visibility', 'Status', 'Actions'].map(h => (
                                     <TableCell key={h} sx={{ fontWeight: 600, color: 'text.secondary', fontSize: 12, letterSpacing: 0.5 }}>
                                         {h.toUpperCase()}
                                     </TableCell>
@@ -135,7 +143,7 @@ export default function DataExplorer() {
                         </TableHead>
                         <TableBody>
                             {datasets.map((ds) => (
-                                <TableRow key={ds.id} hover>
+                                <TableRow key={ds.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/data/${ds.id}`)}>
                                     <TableCell>
                                         <Typography variant="body2" fontWeight={600}>{ds.name}</Typography>
                                         <Typography variant="caption" sx={{ color: 'text.secondary' }}>
@@ -150,7 +158,6 @@ export default function DataExplorer() {
                                     </TableCell>
                                     <TableCell><Typography variant="body2">{formatBytes(ds.file_size_bytes)}</Typography></TableCell>
                                     <TableCell><Typography variant="body2">{ds.row_count?.toLocaleString() ?? '—'}</Typography></TableCell>
-                                    <TableCell><Typography variant="body2">{ds.column_count ?? '—'}</Typography></TableCell>
                                     <TableCell>
                                         {ds.quality_score != null ? (
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -176,15 +183,40 @@ export default function DataExplorer() {
                                         />
                                     </TableCell>
                                     <TableCell>
-                                        <Tooltip title="Delete dataset">
-                                            <IconButton
-                                                size="small"
-                                                sx={{ color: 'error.main' }}
-                                                onClick={() => dispatch(deleteDataset(ds.id))}
-                                            >
-                                                <DeleteIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
+                                        <Chip
+                                            icon={ds.is_public ? <PublicIcon sx={{ fontSize: 14 }} /> : <PrivateIcon sx={{ fontSize: 14 }} />}
+                                            label={ds.is_public ? 'Public' : 'Private'}
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={async (e) => {
+                                                e.stopPropagation()
+                                                await api.patch(`/data/datasets/${ds.id}`, { is_public: !ds.is_public })
+                                                dispatch(fetchDatasets())
+                                            }}
+                                            sx={{ cursor: 'pointer', color: ds.is_public ? '#10B981' : '#6B7280', borderColor: ds.is_public ? '#10B98130' : '#6B728030' }}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                                            <Tooltip title="View · EDA · Transform">
+                                                <IconButton
+                                                    size="small"
+                                                    sx={{ color: '#6366F1' }}
+                                                    onClick={(e) => { e.stopPropagation(); navigate(`/data/${ds.id}`) }}
+                                                >
+                                                    <EdaIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Delete dataset">
+                                                <IconButton
+                                                    size="small"
+                                                    sx={{ color: 'error.main' }}
+                                                    onClick={(e) => { e.stopPropagation(); dispatch(deleteDataset(ds.id)) }}
+                                                >
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Box>
                                     </TableCell>
                                 </TableRow>
                             ))}

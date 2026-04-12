@@ -1,4 +1,5 @@
 """Celery app configuration."""
+import ssl
 from celery import Celery
 from app.core.config import settings
 
@@ -8,6 +9,14 @@ celery_app = Celery(
     backend=settings.REDIS_URL,
     include=["app.workers.training_tasks"],
 )
+
+# TLS configuration for Upstash / rediss:// connections
+_ssl_conf = {}
+if settings.REDIS_URL.startswith("rediss://"):
+    _ssl_conf = {
+        "broker_use_ssl": {"ssl_cert_reqs": ssl.CERT_NONE},
+        "redis_backend_use_ssl": {"ssl_cert_reqs": ssl.CERT_NONE},
+    }
 
 celery_app.conf.update(
     task_serializer="json",
@@ -21,4 +30,6 @@ celery_app.conf.update(
     task_routes={
         "app.workers.training_tasks.*": {"queue": "training"},
     },
+    **_ssl_conf,
 )
+

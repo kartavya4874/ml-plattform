@@ -8,9 +8,10 @@ import {
 import {
     TableChart, Image as ImgIcon, TextFields, Rocket as RocketIcon,
     Science as TestIcon, Lightbulb as ExplainIcon, Delete as DeleteIcon,
-    TrendingUp, ArrowUpward
+    TrendingUp, ArrowUpward, Public as PublicIcon, Lock as PrivateIcon
 } from '@mui/icons-material'
 import { fetchModels, promoteModel, deleteModel } from '../store/modelsSlice'
+import { api } from '../api/client'
 import type { AppDispatch, RootState } from '../store/store'
 
 const stageColors: Record<string, string> = {
@@ -114,7 +115,18 @@ export default function ModelHub() {
                                             />
                                         </Box>
 
-                                        <Typography variant="h6" fontWeight={700} mb={1} noWrap>{model.name}</Typography>
+                                        <Typography variant="h6" fontWeight={700} mb={0.5} noWrap>{model.name}</Typography>
+                                        <Chip
+                                            icon={model.is_public ? <PublicIcon sx={{ fontSize: 14 }} /> : <PrivateIcon sx={{ fontSize: 14 }} />}
+                                            label={model.is_public ? 'Public' : 'Private'}
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={async () => {
+                                                await api.patch(`/models/${model.id}`, { is_public: !model.is_public })
+                                                dispatch(fetchModels())
+                                            }}
+                                            sx={{ cursor: 'pointer', mb: 1, color: model.is_public ? '#10B981' : '#6B7280', borderColor: model.is_public ? '#10B98130' : '#6B728030' }}
+                                        />
 
                                         {/* Top Metric */}
                                         {topMetric && (

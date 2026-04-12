@@ -37,6 +37,21 @@ api.interceptors.response.use(
     (res) => res,
     async (error) => {
         const original = error.config
+
+        // Quota exceeded — redirect to pricing page
+        if (error.response?.status === 402) {
+            const detail = error.response?.data?.detail || 'Quota exceeded — please upgrade your plan'
+            // Dispatch a custom event so any component can listen
+            window.dispatchEvent(new CustomEvent('quota-exceeded', { detail }))
+            // Redirect to pricing page
+            setTimeout(() => {
+                if (window.location.pathname !== '/pricing') {
+                    window.location.href = '/pricing'
+                }
+            }, 100)
+            return Promise.reject(error)
+        }
+
         if (error.response?.status === 401 && !original._retry) {
             if (isRefreshing) {
                 return new Promise((resolve, reject) => {

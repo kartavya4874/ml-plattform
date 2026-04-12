@@ -4,7 +4,10 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, field_validator, model_validator
-from app.models.models import UserRole, DatasetType, TaskType, JobStatus, ModelStage, MLFramework
+from app.models.models import (
+    UserRole, DatasetType, TaskType, JobStatus, ModelStage, MLFramework,
+    SubscriptionTier, SubscriptionStatus,
+)
 
 
 # ── Base ───────────────────────────────────────────────────────────────────────
@@ -30,6 +33,29 @@ class UserRegister(BaseModel):
         return v
 
 
+class UserUpdate(BaseModel):
+    full_name: str | None = None
+    email: EmailStr | None = None
+    username: str | None = None
+    is_public: bool | None = None
+    bio: str | None = None
+    website: str | None = None
+    github_url: str | None = None
+    kaggle_url: str | None = None
+
+
+class UserPasswordUpdate(BaseModel):
+    current_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
@@ -46,10 +72,19 @@ class RefreshRequest(BaseModel):
 
 
 class UserOut(BaseModel):
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "protected_namespaces": ()}
     id: UUID
     email: EmailStr
     full_name: str | None
+    username: str | None = None
+    avatar_url: str | None = None
+    is_public: bool = False
+    bio: str | None = None
+    website: str | None = None
+    github_url: str | None = None
+    kaggle_url: str | None = None
+    followers_count: int = 0
+    following_count: int = 0
     role: UserRole
     is_active: bool
     is_verified: bool
@@ -60,10 +95,12 @@ class UserOut(BaseModel):
 # ── Dataset ────────────────────────────────────────────────────────────────────
 
 class DatasetOut(BaseModel):
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "protected_namespaces": ()}
     id: UUID
     name: str
     description: str | None
+    is_public: bool = False
+    collaborator_ids: list[UUID] = []
     dataset_type: DatasetType
     file_size_bytes: int
     row_count: int | None
@@ -105,7 +142,7 @@ class TrainingJobCreate(BaseModel):
 
 
 class TrainingJobOut(BaseModel):
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "protected_namespaces": ()}
     id: UUID
     dataset_id: UUID
     task_type: TaskType
@@ -124,13 +161,17 @@ class TrainingJobOut(BaseModel):
 class ModelUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
+    is_public: bool | None = None
+    tags: list[str] | None = None
 
 
 class ModelOut(BaseModel):
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "protected_namespaces": ()}
     id: UUID
     name: str
     description: str | None
+    is_public: bool = False
+    collaborator_ids: list[UUID] = []
     task_type: TaskType
     framework: MLFramework
     stage: ModelStage
@@ -159,7 +200,7 @@ class PredictionResponse(BaseModel):
 # ── Deployment ─────────────────────────────────────────────────────────────────
 
 class DeploymentOut(BaseModel):
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "protected_namespaces": ()}
     id: UUID
     model_id: UUID
     endpoint_url: str
@@ -169,7 +210,7 @@ class DeploymentOut(BaseModel):
 
 
 class APIKeyOut(BaseModel):
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "protected_namespaces": ()}
     id: UUID
     name: str
     is_active: bool
@@ -203,3 +244,69 @@ class TokenImportanceResponse(BaseModel):
     tokens: list[str]
     importances: list[float]
     prediction: Any
+
+
+# ── Subscription & Usage ───────────────────────────────────────────────────────
+
+class SubscriptionOut(BaseModel):
+    model_config = {"from_attributes": True, "protected_namespaces": ()}
+    id: UUID
+    user_id: UUID
+    tier: SubscriptionTier
+    status: SubscriptionStatus
+    current_period_start: datetime
+    current_period_end: datetime | None
+    cancel_at_period_end: bool
+    created_at: datetime
+
+
+class UsageOut(BaseModel):
+    model_config = {"from_attributes": True, "protected_namespaces": ()}
+    datasets_created: int = 0
+    training_jobs_run: int = 0
+    models_created: int = 0
+    deployments_active: int = 0
+    inference_requests: int = 0
+    storage_bytes_used: int = 0
+
+
+class TierLimitInfo(BaseModel):
+    datasets: int
+    max_file_size_mb: int
+    training_jobs_per_month: int
+    models: int
+    deployments: int
+    inference_requests_per_month: int
+    api_keys_per_model: int
+
+
+class PricingTierInfo(BaseModel):
+    tier: str
+    name: str
+    price_monthly: int
+    price_label: str
+    description: str
+    limits: TierLimitInfo
+    features: list[str]
+    is_popular: bool = False
+
+
+class SubscriptionSummary(BaseModel):
+    subscription: SubscriptionOut | None
+    usage: UsageOut
+    limits: TierLimitInfo
+    tier: str
+
+
+class InvoiceOut(BaseModel):
+    model_config = {"from_attributes": True, "protected_namespaces": ()}
+    id: UUID
+    user_id: UUID
+    subscription_id: UUID | None
+    amount_due: float
+    amount_paid: float
+    status: str
+    billing_reason: str
+    invoice_pdf_url: str | None
+    created_at: datetime
+

@@ -1,4 +1,4 @@
-"""Inference service with LRU model cache."""
+"""Inference service with LRU model cache — supports sklearn models."""
 import io
 import pickle
 import asyncio
@@ -36,16 +36,22 @@ class LRUModelCache:
 class InferenceService:
     def __init__(self):
         self._cache = LRUModelCache(max_size=settings.MODEL_CACHE_MAX_SIZE)
-        self._storage = StorageService()
+        self._storage: Any = None
+
+    async def _get_storage(self):
+        if self._storage is None:
+            self._storage = await StorageService.get_instance()
+        return self._storage
 
     async def _load_artifact(self, model_obj: MLModel) -> Any:
-        """Load model artifact from MinIO into cache."""
+        """Load model artifact from storage into cache."""
         cache_key = str(model_obj.id)
         cached = self._cache.get(cache_key)
         if cached:
             return cached
 
-        artifact_bytes = await self._storage.download_bytes(
+        storage = await self._get_storage()
+        artifact_bytes = await storage.download_bytes(
             settings.MINIO_BUCKET_MODELS, model_obj.artifact_path
         )
         loaded = pickle.loads(artifact_bytes)
@@ -59,121 +65,63 @@ class InferenceService:
         if task in (TaskType.classification, TaskType.regression):
             return await self._predict_tabular(model_obj, inputs)
         elif task == TaskType.image_classification:
-            return await self._predict_image(model_obj, inputs)
+            return {"prediction": "Image classification not supported for sklearn models"}
         elif task in (TaskType.sentiment, TaskType.text_classification):
-            return await self._predict_text(model_obj, inputs)
+            return {"prediction": "Text classification not supported for sklearn models"}
         else:
             raise ValueError(f"Unknown task type: {task}")
 
     async def _predict_tabular(self, model_obj: MLModel, inputs: dict) -> dict:
-        artifact = await self._load_artifact(model_obj)
-        preprocessor = artifact["preprocessor"]
-        automl = artifact["automl"]
-        feature_names = artifact["feature_names"]
+        """Predict using a sklearn model. Inputs are {feature_name: value}."""
+        model = await self._load_artifact(model_obj)
+        loop = asyncio.get_event_loop()
 
-        df = pd.DataFrame([inputs])[feature_names]
-        X = preprocessor.transform(df)
+        def _run():
+            # Build feature dataframe from inputs
+            df = pd.DataFrame([inputs])
 
-        pred = automl.predict(X)[0]
-        result: dict[str, Any] = {"prediction": str(pred) if not isinstance(pred, (int, float)) else float(pred)}
+            # Ensure numeric columns are numeric
+            for col in df.columns:
+                try:
+                    df[col] = pd.to_numeric(df[col])
+                except (ValueError, TypeError):
+                    # Encode categorical as integer codes
+                    df[col] = df[col].astype("category").cat.codes
 
-        try:
-            proba = automl.predict_proba(X)[0]
-            classes = list(map(str, automl.classes_))
-            result["confidence"] = float(max(proba))
-            result["class_probabilities"] = {c: float(p) for c, p in zip(classes, proba)}
-        except Exception:
-            pass
+            pred = model.predict(df)[0]
+            result: dict[str, Any] = {
+                "prediction": float(pred) if isinstance(pred, (int, float, np.integer, np.floating)) else str(pred),
+            }
 
-        return result
+            # Try to get probabilities for classification
+            try:
+                if hasattr(model, "predict_proba"):
+                    proba = model.predict_proba(df)[0]
+                    classes = list(map(str, model.classes_))
+                    result["confidence"] = round(float(max(proba)), 4)
+                    result["class_probabilities"] = {c: round(float(p), 4) for c, p in zip(classes, proba)}
+            except Exception:
+                pass
 
-    async def _predict_image(self, model_obj: MLModel, inputs: dict) -> dict:
-        """inputs must contain 'image_b64' key (base64 encoded)."""
-        import base64
-        from PIL import Image
-        import torch
-        from torchvision import transforms, models
-        from torchvision.models import EfficientNet_B0_Weights, ResNet50_Weights
+            return result
 
-        artifact = await self._load_artifact(model_obj)
-        class_to_idx = artifact["class_to_idx"]
-        backbone = artifact.get("backbone", "efficientnet_b0")
-        num_classes = artifact["num_classes"]
-        idx_to_class = {v: k for k, v in class_to_idx.items()}
+        return await loop.run_in_executor(None, _run)
 
-        # Rebuild model in eval mode
-        if backbone == "resnet50":
-            from torchvision.models import resnet50
-            net = resnet50(weights=None)
-            net.fc = torch.nn.Linear(net.fc.in_features, num_classes)
-        else:
-            from torchvision.models import efficientnet_b0
-            net = efficientnet_b0(weights=None)
-            net.classifier[1] = torch.nn.Linear(net.classifier[1].in_features, num_classes)
+    async def get_model_features(self, model_obj: MLModel) -> dict[str, Any]:
+        """Get the feature names and types expected by the model."""
+        model = await self._load_artifact(model_obj)
 
-        state_dict = {k: torch.tensor(v) for k, v in artifact["model_state"].items()}
-        net.load_state_dict(state_dict)
-        net.eval()
-
-        transform = transforms.Compose([
-            transforms.Resize((256, 256)),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-        ])
-
-        img_bytes = base64.b64decode(inputs.get("image_b64", ""))
-        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-        tensor = transform(img).unsqueeze(0)
-
-        with torch.no_grad():
-            logits = net(tensor)
-            proba = torch.softmax(logits, dim=1)[0].numpy()
-            pred_idx = int(np.argmax(proba))
+        features = []
+        if hasattr(model, "feature_names_in_"):
+            features = list(model.feature_names_in_)
+        elif hasattr(model, "n_features_in_"):
+            features = [f"feature_{i}" for i in range(model.n_features_in_)]
 
         return {
-            "prediction": idx_to_class[pred_idx],
-            "confidence": float(max(proba)),
-            "class_probabilities": {idx_to_class[i]: float(p) for i, p in enumerate(proba)},
-        }
-
-    async def _predict_text(self, model_obj: MLModel, inputs: dict) -> dict:
-        import tarfile, tempfile, shutil
-        from transformers import AutoTokenizer, AutoModelForSequenceClassification
-        import torch
-
-        cache_key = f"nlp_{model_obj.id}"
-        nlp_cached = self._cache.get(cache_key)
-
-        if not nlp_cached:
-            tar_bytes = await self._storage.download_bytes(settings.MINIO_BUCKET_MODELS, model_obj.artifact_path)
-            tmpdir = tempfile.mkdtemp()
-            with tarfile.open(fileobj=io.BytesIO(tar_bytes), mode="r:gz") as tar:
-                tar.extractall(tmpdir)
-            model_dir = tmpdir + "/model"
-            tokenizer = AutoTokenizer.from_pretrained(model_dir)
-            net = AutoModelForSequenceClassification.from_pretrained(model_dir)
-            le = pickle.load(open(model_dir + "/label_encoder.pkl", "rb"))
-            net.eval()
-            nlp_cached = {"tokenizer": tokenizer, "model": net, "label_encoder": le, "tmpdir": tmpdir}
-            self._cache.put(cache_key, nlp_cached)
-
-        tokenizer = nlp_cached["tokenizer"]
-        net = nlp_cached["model"]
-        le = nlp_cached["label_encoder"]
-
-        text = inputs.get("text", "")
-        enc = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=128)
-        with torch.no_grad():
-            logits = net(**enc).logits
-        proba = torch.softmax(logits, dim=1)[0].numpy()
-        pred_idx = int(np.argmax(proba))
-        label_names = list(le.classes_)
-
-        return {
-            "prediction": label_names[pred_idx],
-            "confidence": float(max(proba)),
-            "class_probabilities": {label_names[i]: float(p) for i, p in enumerate(proba)},
+            "features": features,
+            "n_features": len(features),
+            "model_type": type(model).__name__,
+            "task_type": model_obj.task_type,
         }
 
     async def batch_predict(self, model_obj: MLModel, content: bytes, filename: str) -> bytes:

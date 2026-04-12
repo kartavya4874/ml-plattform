@@ -16,13 +16,30 @@ async def list_models(
     stage: str | None = None,
     current_user: User = Depends(get_current_user),
 ):
-    """List all trained models with optional filters."""
-    query = {"owner_id": current_user.id}
+    """List all trained models with optional filters (includes shared models)."""
+    # Base query for owned or collaborated models
+    query = {
+        "$or": [
+            {"owner_id": current_user.id},
+            {"collaborator_ids": current_user.id}
+        ]
+    }
+    
     if task_type:
         query["task_type"] = task_type
     if stage:
         query["stage"] = stage
     return await MLModel.find(query).sort(-MLModel.created_at).to_list()
+
+
+def _check_model_access(model: MLModel, user: User, requires_edit: bool = False):
+    if model.owner_id == user.id:
+        return
+    if user.id in model.collaborator_ids:
+        return
+    if not requires_edit and model.is_public:
+        return
+    raise HTTPException(status_code=403, detail="Not authorized to access this model")
 
 
 @router.get("/{model_id}", response_model=ModelOut)
@@ -31,9 +48,10 @@ async def get_model(
     current_user: User = Depends(get_current_user),
 ):
     """Get full model details including metrics and artifact paths."""
-    model = await MLModel.find_one(MLModel.id == model_id, MLModel.owner_id == current_user.id)
+    model = await MLModel.get(model_id)
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
+    _check_model_access(model, current_user)
     return model
 
 
@@ -43,10 +61,11 @@ async def update_model(
     body: ModelUpdate,
     current_user: User = Depends(get_current_user),
 ):
-    """Update model name or description."""
-    model = await MLModel.find_one(MLModel.id == model_id, MLModel.owner_id == current_user.id)
+    """Update model name, description, visibility, tags."""
+    model = await MLModel.get(model_id)
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
+    _check_model_access(model, current_user, requires_edit=True)
     
     modified = False
     if body.name:
@@ -54,6 +73,12 @@ async def update_model(
         modified = True
     if body.description is not None:
         model.description = body.description
+        modified = True
+    if body.is_public is not None:
+        model.is_public = body.is_public
+        modified = True
+    if body.tags is not None:
+        model.tags = body.tags
         modified = True
         
     if modified:
@@ -67,9 +92,11 @@ async def delete_model(
     current_user: User = Depends(get_current_user),
 ):
     """Delete a model and its MinIO artifacts."""
-    model = await MLModel.find_one(MLModel.id == model_id, MLModel.owner_id == current_user.id)
+    model = await MLModel.get(model_id)
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
+    if model.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the owner can delete the model")
     if model.stage == ModelStage.production:
         raise HTTPException(status_code=409, detail="Cannot delete a production model. Archive it first.")
     
@@ -82,9 +109,10 @@ async def get_model_metrics(
     current_user: User = Depends(get_current_user),
 ):
     """Return full evaluation metrics for a model."""
-    model = await MLModel.find_one(MLModel.id == model_id, MLModel.owner_id == current_user.id)
+    model = await MLModel.get(model_id)
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
+    _check_model_access(model, current_user)
     return model.metrics or {}
 
 
@@ -98,9 +126,10 @@ async def promote_model(
     Explainability requirement: the model must have metrics set (run training),
     ensuring the explainability pipeline has been invoked as part of training.
     """
-    model = await MLModel.find_one(MLModel.id == model_id, MLModel.owner_id == current_user.id)
+    model = await MLModel.get(model_id)
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
+    _check_model_access(model, current_user, requires_edit=True)
     if model.stage not in (ModelStage.staging, ModelStage.training):
         raise HTTPException(status_code=400, detail=f"Model stage is '{model.stage.value}', not promotable")
     if not model.metrics:

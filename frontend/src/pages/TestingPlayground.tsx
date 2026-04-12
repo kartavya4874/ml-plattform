@@ -1,47 +1,65 @@
-import { useState, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
     Box, Typography, Card, CardContent, Button, TextField, CircularProgress,
-    Alert, LinearProgress, Chip
+    Alert, LinearProgress, Chip, IconButton, Tooltip, Grid, Divider,
 } from '@mui/material'
-import { PlayArrow, CloudUpload } from '@mui/icons-material'
+import { PlayArrow, ArrowBack, History as HistoryIcon } from '@mui/icons-material'
 import { api } from '../api/client'
+
+interface FeatureInfo {
+    features: string[]
+    n_features: number
+    model_type: string
+    task_type: string
+}
 
 export default function TestingPlayground() {
     const { id } = useParams<{ id: string }>()
+    const navigate = useNavigate()
+
+    const [featureInfo, setFeatureInfo] = useState<FeatureInfo | null>(null)
     const [inputs, setInputs] = useState<Record<string, string>>({})
-    const [text, setText] = useState('')
-    const [imageB64, setImageB64] = useState<string | null>(null)
     const [result, setResult] = useState<any>(null)
     const [loading, setLoading] = useState(false)
+    const [featuresLoading, setFeaturesLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [history, setHistory] = useState<any[]>([])
-    const fileRef = useRef<HTMLInputElement>(null)
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-        const reader = new FileReader()
-        reader.onload = () => {
-            const b64 = (reader.result as string).split(',')[1]
-            setImageB64(b64)
-        }
-        reader.readAsDataURL(file)
-    }
+    // Load feature names from the model
+    useEffect(() => {
+        if (!id) return
+        setFeaturesLoading(true)
+        api.get(`/inference/${id}/features`)
+            .then(({ data }) => {
+                setFeatureInfo(data)
+                // Pre-populate empty inputs
+                const empty: Record<string, string> = {}
+                data.features.forEach((f: string) => { empty[f] = '' })
+                setInputs(empty)
+            })
+            .catch(() => setError('Could not load model features'))
+            .finally(() => setFeaturesLoading(false))
+    }, [id])
 
     const handlePredict = async () => {
         setLoading(true)
         setError(null)
         try {
-            const payload = imageB64
-                ? { inputs: { image_b64: imageB64 } }
-                : text
-                    ? { inputs: { text } }
-                    : { inputs }
+            // Convert numeric strings to numbers
+            const cleanInputs: Record<string, any> = {}
+            Object.entries(inputs).forEach(([key, val]) => {
+                const num = Number(val)
+                cleanInputs[key] = isNaN(num) || val.trim() === '' ? val : num
+            })
 
-            const { data } = await api.post(`/inference/${id}/predict`, payload)
+            const { data } = await api.post(`/inference/${id}/predict`, { inputs: cleanInputs })
             setResult(data)
-            setHistory(h => [{ ...data, timestamp: new Date().toLocaleTimeString() }, ...h.slice(0, 9)])
+            setHistory(h => [{
+                ...data,
+                inputs: { ...cleanInputs },
+                timestamp: new Date().toLocaleTimeString()
+            }, ...h.slice(0, 9)])
         } catch (e: any) {
             setError(e.response?.data?.detail || 'Prediction failed')
         } finally {
@@ -49,63 +67,79 @@ export default function TestingPlayground() {
         }
     }
 
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') handlePredict()
+    }
+
+    if (featuresLoading) return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>
+    )
+
     return (
         <Box className="fade-in">
-            <Box mb={3}>
-                <Typography variant="h4" fontWeight={800}>Testing Playground</Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>Run predictions against your model in real-time</Typography>
+            {/* Header */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                <IconButton onClick={() => navigate('/models')} sx={{ color: 'text.secondary' }}>
+                    <ArrowBack />
+                </IconButton>
+                <Box>
+                    <Typography variant="h4" fontWeight={800}>Prediction Playground</Typography>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        Enter values for each feature and get instant predictions
+                        {featureInfo && (
+                            <> · <Chip label={featureInfo.model_type} size="small" sx={{ height: 18, fontSize: 10, ml: 0.5 }} />
+                            <Chip label={featureInfo.task_type} size="small" sx={{ height: 18, fontSize: 10, ml: 0.5, background: 'rgba(99,102,241,0.12)', color: '#818CF8' }} /></>
+                        )}
+                    </Typography>
+                </Box>
             </Box>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
-                {/* Input Panel */}
-                <Card>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+                {/* Input Panel — individual fields for each feature */}
+                <Card sx={{ borderRadius: '14px' }}>
                     <CardContent sx={{ p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} mb={2}>Input</Typography>
-
-                        {/* Image Upload */}
-                        <Box
-                            sx={{ border: '2px dashed rgba(99,102,241,0.3)', borderRadius: 2, p: 3, textAlign: 'center', cursor: 'pointer', mb: 2 }}
-                            onClick={() => fileRef.current?.click()}
-                        >
-                            <input type="file" ref={fileRef} accept="image/*" hidden onChange={handleImageUpload} />
-                            {imageB64 ? (
-                                <img src={`data:image/jpeg;base64,${imageB64}`} alt="preview" style={{ maxHeight: 200, borderRadius: 8 }} />
-                            ) : (
-                                <>
-                                    <CloudUpload sx={{ fontSize: 36, color: 'primary.main', mb: 1 }} />
-                                    <Typography variant="body2">Click to upload image (for image models)</Typography>
-                                </>
-                            )}
-                        </Box>
-
-                        {/* Text Input */}
-                        <TextField
-                            id="test-text-input"
-                            label="Text input (for NLP models)"
-                            value={text}
-                            onChange={(e) => setText(e.target.value)}
-                            fullWidth
-                            multiline
-                            rows={3}
-                            sx={{ mb: 2 }}
-                        />
-
-                        {/* Generic key-value inputs */}
-                        <Typography variant="body2" fontWeight={600} mb={1} sx={{ color: 'text.secondary' }}>
-                            Or enter tabular features (JSON):
+                        <Typography variant="h6" fontWeight={700} mb={0.5}>Input Features</Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2.5 }}>
+                            {featureInfo ? `${featureInfo.n_features} features expected` : 'Enter values below'}
                         </Typography>
-                        <TextField
-                            id="test-json-input"
-                            label="Features JSON"
-                            placeholder='{"feature1": 1.5, "feature2": "value"}'
-                            fullWidth
-                            multiline
-                            rows={3}
-                            onChange={(e) => {
-                                try { setInputs(JSON.parse(e.target.value)) } catch { }
-                            }}
-                            sx={{ mb: 2 }}
-                        />
+
+                        {featureInfo && featureInfo.features.length > 0 ? (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                {featureInfo.features.map((feat) => (
+                                    <TextField
+                                        key={feat}
+                                        id={`input-${feat}`}
+                                        label={feat}
+                                        value={inputs[feat] || ''}
+                                        onChange={(e) => setInputs(prev => ({ ...prev, [feat]: e.target.value }))}
+                                        onKeyDown={handleKeyDown}
+                                        fullWidth
+                                        size="small"
+                                        placeholder="Enter value..."
+                                        InputProps={{
+                                            sx: { borderRadius: '10px' }
+                                        }}
+                                    />
+                                ))}
+                            </Box>
+                        ) : (
+                            <TextField
+                                id="test-json-input"
+                                label="Features (JSON)"
+                                placeholder='{"feature1": 1.5, "feature2": "value"}'
+                                fullWidth
+                                multiline
+                                rows={4}
+                                onChange={(e) => {
+                                    try { setInputs(JSON.parse(e.target.value)) } catch { }
+                                }}
+                                sx={{ mb: 2 }}
+                            />
+                        )}
+
+                        <Divider sx={{ my: 2.5, borderColor: 'rgba(255,255,255,0.06)' }} />
+
+                        {error && <Alert severity="error" sx={{ mb: 2, borderRadius: '10px' }}>{error}</Alert>}
 
                         <Button
                             id="test-predict-btn"
@@ -114,52 +148,81 @@ export default function TestingPlayground() {
                             onClick={handlePredict}
                             disabled={loading}
                             startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <PlayArrow />}
-                            sx={{ py: 1.5 }}
+                            sx={{
+                                py: 1.5, borderRadius: '12px', fontWeight: 700,
+                                background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                                fontSize: 15,
+                            }}
                         >
-                            {loading ? 'Running Prediction...' : 'Predict'}
+                            {loading ? 'Running Prediction...' : '🚀 Predict'}
                         </Button>
                     </CardContent>
                 </Card>
 
                 {/* Results Panel */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>}
-
-                    {result && (
-                        <Card>
+                    {result ? (
+                        <Card sx={{ borderRadius: '14px', border: '1px solid rgba(16,185,129,0.2)' }}>
                             <CardContent sx={{ p: 3 }}>
                                 <Typography variant="h6" fontWeight={700} mb={2}>Prediction Result</Typography>
-                                <Box sx={{ mb: 2 }}>
-                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>PREDICTION</Typography>
-                                    <Typography variant="h3" fontWeight={800} sx={{ color: '#10B981', mt: 0.5 }}>
-                                        {String(result.prediction)}
+                                <Box sx={{
+                                    p: 3, borderRadius: '12px',
+                                    background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)',
+                                    textAlign: 'center', mb: 2,
+                                }}>
+                                    <Typography variant="caption" sx={{ color: 'text.secondary', letterSpacing: 1, fontWeight: 600 }}>PREDICTED VALUE</Typography>
+                                    <Typography variant="h2" fontWeight={800} sx={{ color: '#10B981', mt: 0.5 }}>
+                                        {typeof result.prediction === 'number'
+                                            ? Number(result.prediction).toLocaleString(undefined, { maximumFractionDigits: 4 })
+                                            : String(result.prediction)}
                                     </Typography>
                                 </Box>
+
                                 {result.confidence != null && (
                                     <Box mb={2}>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                                             <Typography variant="body2">Confidence</Typography>
-                                            <Typography variant="body2" fontWeight={600}>{(result.confidence * 100).toFixed(1)}%</Typography>
+                                            <Typography variant="body2" fontWeight={700} sx={{ color: '#6366F1' }}>
+                                                {(result.confidence * 100).toFixed(1)}%
+                                            </Typography>
                                         </Box>
-                                        <LinearProgress variant="determinate" value={result.confidence * 100} sx={{ height: 8, borderRadius: 4 }} />
+                                        <LinearProgress variant="determinate" value={result.confidence * 100}
+                                            sx={{ height: 8, borderRadius: 4, background: 'rgba(99,102,241,0.1)',
+                                                '& .MuiLinearProgress-bar': { borderRadius: 4, background: 'linear-gradient(90deg, #6366F1, #10B981)' } }} />
                                     </Box>
                                 )}
+
                                 {result.class_probabilities && (
                                     <Box>
-                                        <Typography variant="body2" fontWeight={600} mb={1}>Class Probabilities</Typography>
-                                        {Object.entries(result.class_probabilities as Record<string, number>).sort((a, b) => b[1] - a[1]).map(([cls, prob]) => (
-                                            <Box key={cls} sx={{ mb: 1 }}>
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.3 }}>
-                                                    <Typography variant="caption">{cls}</Typography>
-                                                    <Typography variant="caption">{(prob * 100).toFixed(1)}%</Typography>
+                                        <Typography variant="body2" fontWeight={600} mb={1.5}>Class Probabilities</Typography>
+                                        {Object.entries(result.class_probabilities as Record<string, number>)
+                                            .sort((a, b) => b[1] - a[1])
+                                            .map(([cls, prob]) => (
+                                                <Box key={cls} sx={{ mb: 1.5 }}>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.3 }}>
+                                                        <Typography variant="caption" fontWeight={600}>{cls}</Typography>
+                                                        <Typography variant="caption" fontWeight={600}>{(prob * 100).toFixed(1)}%</Typography>
+                                                    </Box>
+                                                    <LinearProgress variant="determinate" value={prob * 100}
+                                                        sx={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.04)',
+                                                            '& .MuiLinearProgress-bar': { borderRadius: 3 } }} />
                                                 </Box>
-                                                <LinearProgress variant="determinate" value={prob * 100} sx={{ height: 4, borderRadius: 2 }} />
-                                            </Box>
-                                        ))}
+                                            ))}
                                     </Box>
                                 )}
-                                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1 }}>
-                                    Latency: {result.latency_ms?.toFixed(1)}ms
+
+                                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 2 }}>
+                                    ⚡ Latency: {result.latency_ms?.toFixed(1)}ms
+                                </Typography>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <Card sx={{ borderRadius: '14px' }}>
+                            <CardContent sx={{ p: 4, textAlign: 'center' }}>
+                                <PlayArrow sx={{ fontSize: 48, color: 'text.secondary', opacity: 0.2, mb: 2 }} />
+                                <Typography variant="h6" sx={{ color: 'text.secondary' }}>No prediction yet</Typography>
+                                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                                    Fill in the feature values and click Predict
                                 </Typography>
                             </CardContent>
                         </Card>
@@ -167,15 +230,34 @@ export default function TestingPlayground() {
 
                     {/* History */}
                     {history.length > 0 && (
-                        <Card>
+                        <Card sx={{ borderRadius: '14px' }}>
                             <CardContent sx={{ p: 2.5 }}>
-                                <Typography variant="body2" fontWeight={600} mb={1.5}>Recent Predictions</Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                                    <HistoryIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+                                    <Typography variant="body2" fontWeight={600}>Recent Predictions</Typography>
+                                </Box>
                                 {history.map((h, i) => (
-                                    <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.75, borderBottom: i < history.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
-                                        <Chip label={String(h.prediction)} size="small" sx={{ background: 'rgba(16,185,129,0.15)', color: '#34D399', fontSize: 11 }} />
+                                    <Box key={i} sx={{
+                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                        py: 1, borderBottom: i < history.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none'
+                                    }}>
+                                        <Chip
+                                            label={typeof h.prediction === 'number'
+                                                ? Number(h.prediction).toLocaleString(undefined, { maximumFractionDigits: 4 })
+                                                : String(h.prediction)}
+                                            size="small"
+                                            sx={{
+                                                background: 'rgba(16,185,129,0.12)', color: '#34D399',
+                                                fontSize: 12, fontWeight: 700,
+                                            }}
+                                        />
                                         <Box sx={{ textAlign: 'right' }}>
                                             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>{h.timestamp}</Typography>
-                                            {h.confidence != null && <Typography variant="caption" sx={{ color: 'text.secondary' }}>{(h.confidence * 100).toFixed(0)}% confidence</Typography>}
+                                            {h.confidence != null && (
+                                                <Typography variant="caption" sx={{ color: '#818CF8' }}>
+                                                    {(h.confidence * 100).toFixed(0)}% confidence
+                                                </Typography>
+                                            )}
                                         </Box>
                                     </Box>
                                 ))}

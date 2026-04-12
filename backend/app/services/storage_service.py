@@ -214,25 +214,35 @@ class FirebaseStorage(BaseStorage):
                 log.warning("firebase.credentials.missing", hint="Check FIREBASE_CREDENTIALS_JSON")
             else:
                 cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_JSON)
-                firebase_admin.initialize_app(cred)
+                firebase_admin.initialize_app(cred, {
+                    "storageBucket": settings.FIREBASE_STORAGE_BUCKET,
+                })
+
+    def _get_bucket(self):
+        return self._storage.bucket(settings.FIREBASE_STORAGE_BUCKET)
+
+    def _obj_path(self, bucket: str, object_name: str) -> str:
+        """Map logical bucket (datasets/models) to a prefix inside the single Firebase bucket."""
+        return f"{bucket}/{object_name}"
 
     async def upload_bytes(self, bucket: str, object_name: str, data: bytes, content_type: str = "application/octet-stream"):
-        b = self._storage.bucket(bucket)
-        blob = b.blob(object_name)
+        b = self._get_bucket()
+        blob = b.blob(self._obj_path(bucket, object_name))
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, blob.upload_from_string, data, content_type)
 
     async def download_bytes(self, bucket: str, object_name: str) -> bytes:
-        b = self._storage.bucket(bucket)
-        blob = b.blob(object_name)
-        if not blob.exists():
-            raise ValueError(f"File not found: {object_name}")
+        b = self._get_bucket()
+        blob = b.blob(self._obj_path(bucket, object_name))
         loop = asyncio.get_event_loop()
+        exists = await loop.run_in_executor(None, blob.exists)
+        if not exists:
+            raise ValueError(f"File not found: {object_name}")
         return await loop.run_in_executor(None, blob.download_as_bytes)
 
     async def delete_object(self, bucket: str, object_name: str):
-        b = self._storage.bucket(bucket)
-        blob = b.blob(object_name)
+        b = self._get_bucket()
+        blob = b.blob(self._obj_path(bucket, object_name))
         loop = asyncio.get_event_loop()
         try:
             await loop.run_in_executor(None, blob.delete)
@@ -241,18 +251,19 @@ class FirebaseStorage(BaseStorage):
 
     async def presigned_url(self, bucket: str, object_name: str, expiry_hours: int = 1) -> str:
         from datetime import timedelta
-        b = self._storage.bucket(bucket)
-        blob = b.blob(object_name)
+        b = self._get_bucket()
+        blob = b.blob(self._obj_path(bucket, object_name))
         loop = asyncio.get_event_loop()
         def _get_url():
             return blob.generate_signed_url(version="v4", expiration=timedelta(hours=expiry_hours), method="GET")
         return await loop.run_in_executor(None, _get_url)
 
     async def list_objects(self, bucket: str, prefix: str = "") -> list[str]:
-        b = self._storage.bucket(bucket)
+        b = self._get_bucket()
+        full_prefix = f"{bucket}/{prefix}" if prefix else f"{bucket}/"
         loop = asyncio.get_event_loop()
         def _list():
-            return [blob.name for blob in b.list_blobs(prefix=prefix)]
+            return [blob.name.replace(f"{bucket}/", "", 1) for blob in b.list_blobs(prefix=full_prefix)]
         return await loop.run_in_executor(None, _list)
 
 

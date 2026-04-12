@@ -26,35 +26,30 @@ export default function RegisterPage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'radial-gradient(ellipse at 70% 20%, rgba(16,185,129,0.12) 0%, transparent 50%), radial-gradient(ellipse at 30% 80%, rgba(99,102,241,0.1) 0%, transparent 50%), #0A0A0F',
+            background: 'var(--bg)',
         }}>
             <Box sx={{
                 width: '100%', maxWidth: 440, mx: 2,
-                background: 'rgba(255,255,255,0.03)',
-                backdropFilter: 'blur(24px)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 4,
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 3,
                 p: 4,
             }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 4 }}>
                     <Box sx={{
                         width: 44, height: 44, borderRadius: '12px',
-                        background: 'linear-gradient(135deg, #10B981, #3B82F6)',
+                        background: '#FAFAFA',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 4px 20px rgba(16,185,129,0.4)',
                     }}>
-                        <LogoIcon sx={{ color: 'white', fontSize: 22 }} />
+                        <LogoIcon sx={{ color: '#000', fontSize: 22 }} />
                     </Box>
                     <Box>
-                        <Typography variant="h6" fontWeight={700}>NoCode AI Platform</Typography>
+                        <Typography variant="h6" fontWeight={700}>NexusML</Typography>
                         <Typography variant="caption" sx={{ color: 'text.secondary' }}>Free to get started</Typography>
                     </Box>
                 </Box>
 
-                <Typography variant="h4" fontWeight={800} mb={0.5} sx={{
-                    background: 'linear-gradient(135deg, #10B981, #6366F1)',
-                    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                }}>
+                <Typography variant="h4" fontWeight={700} mb={0.5} sx={{ color: 'text.primary' }}>
                     Create account
                 </Typography>
                 <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>

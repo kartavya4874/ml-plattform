@@ -6,6 +6,7 @@ from app.models.models import User, MLModel, ModelStage, Deployment, APIKey
 from app.schemas.schemas import DeploymentOut, APIKeyOut
 from app.api.v1.auth import get_current_user
 from app.core.security import hash_api_key
+from app.services.quota_service import check_quota, increment_usage
 from app.core.config import settings
 
 router = APIRouter(prefix="/deploy", tags=["Deployment"])
@@ -17,6 +18,9 @@ async def deploy_model(
     current_user: User = Depends(get_current_user),
 ):
     """Generate and activate a REST API endpoint for the model."""
+    # Check deployment quota
+    await check_quota(current_user.id, "deployments")
+
     model_obj = await MLModel.find_one(MLModel.id == model_id, MLModel.owner_id == current_user.id)
     if not model_obj:
         raise HTTPException(status_code=404, detail="Model not found")
@@ -145,7 +149,7 @@ async def export_model(
 
     # Return download URL (pre-signed MinIO URL)
     from app.services.storage_service import StorageService
-    storage = StorageService()
+    storage = await StorageService.get_instance()
     if format == "onnx" and model_obj.onnx_path:
         url = await storage.presigned_url(settings.MINIO_BUCKET_MODELS, model_obj.onnx_path)
     else:

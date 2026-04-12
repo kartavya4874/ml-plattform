@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     # ── Storage Alternative Backends ─────────────────────────────────────────
     STORAGE_BACKEND: str = "local" # options: "local", "minio", "mongodb", "firebase"
     FIREBASE_CREDENTIALS_JSON: str = "" # Path to firebase service account json
+    FIREBASE_STORAGE_BUCKET: str = "" # Firebase Storage bucket name (e.g. "your-project.appspot.com")
     API_BASE_URL: str = "http://localhost:8000" # Used for local/mongodb presigned URLs
 
 

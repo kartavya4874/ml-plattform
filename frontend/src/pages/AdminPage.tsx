@@ -1,0 +1,196 @@
+import { useState, useEffect } from 'react'
+import { useSelector } from 'react-redux'
+import { Box, Typography, Card, Grid, Chip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, Select, MenuItem, TextField, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Tabs, Tab } from '@mui/material'
+import { Delete as DeleteIcon, AdminPanelSettings as AdminIcon, Refresh as RefreshIcon } from '@mui/icons-material'
+import { api } from '../api/client'
+import type { RootState } from '../store/store'
+
+export default function AdminPage() {
+    const user = useSelector((s: RootState) => s.auth.user)
+    const [tab, setTab] = useState(0)
+    const [stats, setStats] = useState<any>(null)
+    const [users, setUsers] = useState<any[]>([])
+    const [datasets, setDatasets] = useState<any[]>([])
+    const [models, setModels] = useState<any[]>([])
+    const [discussions, setDiscussions] = useState<any[]>([])
+
+    const loadData = async () => {
+        try {
+            const [st, u, d, m, di] = await Promise.all([
+                api.get('/admin/stats'), api.get('/admin/users'), api.get('/admin/datasets'),
+                api.get('/admin/models'), api.get('/admin/discussions'),
+            ])
+            setStats(st.data); setUsers(u.data); setDatasets(d.data); setModels(m.data); setDiscussions(di.data)
+        } catch (e) { console.error(e) }
+    }
+
+    useEffect(() => { loadData() }, [])
+
+    const updateUserRole = async (userId: string, role: string) => {
+        await api.patch(`/admin/users/${userId}`, { role })
+        loadData()
+    }
+
+    const toggleUserActive = async (userId: string, is_active: boolean) => {
+        await api.patch(`/admin/users/${userId}`, { is_active })
+        loadData()
+    }
+
+    const deleteUser = async (userId: string) => {
+        if (!window.confirm('Delete this user?')) return
+        await api.delete(`/admin/users/${userId}`)
+        loadData()
+    }
+
+    const deleteDataset = async (id: string) => { await api.delete(`/admin/datasets/${id}`); loadData() }
+    const deleteModel = async (id: string) => { await api.delete(`/admin/models/${id}`); loadData() }
+    const deleteDiscussion = async (id: string) => { await api.delete(`/admin/discussions/${id}`); loadData() }
+
+    if (user?.role !== 'admin') {
+        return (
+            <Box sx={{ textAlign: 'center', py: 8 }}>
+                <AdminIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+                <Typography variant="h5" fontWeight={700}>Admin Access Required</Typography>
+                <Typography color="text.secondary">You need admin privileges to access this page.</Typography>
+            </Box>
+        )
+    }
+
+    return (
+        <Box sx={{ maxWidth: 1200, mx: 'auto' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+                <Box>
+                    <Typography variant="h4" fontWeight={800}>Admin Panel</Typography>
+                    <Typography color="text.secondary">Manage users, content, and platform settings</Typography>
+                </Box>
+                <Button startIcon={<RefreshIcon />} variant="outlined" onClick={loadData}>Refresh</Button>
+            </Box>
+
+            {stats && (
+                <Grid container spacing={2} sx={{ mb: 4 }}>
+                    {[
+                        { label: 'Users', val: stats.total_users },
+                        { label: 'Datasets', val: stats.total_datasets },
+                        { label: 'Models', val: stats.total_models },
+                        { label: 'Notebooks', val: stats.total_notebooks },
+                        { label: 'Competitions', val: stats.total_competitions },
+                        { label: 'Organizations', val: stats.total_organizations },
+                        { label: 'Discussions', val: stats.total_discussions },
+                        { label: 'Public Datasets', val: stats.public_datasets },
+                        { label: 'Public Models', val: stats.public_models },
+                    ].map(s => (
+                        <Grid item xs={6} md={3} lg={2} key={s.label}>
+                            <Card sx={{ p: 2, textAlign: 'center' }}>
+                                <Typography variant="h5" fontWeight={800}>{s.val}</Typography>
+                                <Typography variant="caption" color="text.secondary">{s.label}</Typography>
+                            </Card>
+                        </Grid>
+                    ))}
+                </Grid>
+            )}
+
+            <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3, borderBottom: '1px solid #222' }}>
+                <Tab label={`Users (${users.length})`} />
+                <Tab label={`Datasets (${datasets.length})`} />
+                <Tab label={`Models (${models.length})`} />
+                <Tab label={`Discussions (${discussions.length})`} />
+            </Tabs>
+
+            {tab === 0 && (
+                <TableContainer component={Card}>
+                    <Table size="small">
+                        <TableHead><TableRow>
+                            <TableCell>Email</TableCell><TableCell>Name</TableCell><TableCell>Username</TableCell>
+                            <TableCell>Role</TableCell><TableCell>Active</TableCell><TableCell>Actions</TableCell>
+                        </TableRow></TableHead>
+                        <TableBody>
+                            {users.map(u => (
+                                <TableRow key={u.id}>
+                                    <TableCell>{u.email}</TableCell>
+                                    <TableCell>{u.full_name || '—'}</TableCell>
+                                    <TableCell>{u.username || '—'}</TableCell>
+                                    <TableCell>
+                                        <Select size="small" value={u.role} onChange={e => updateUserRole(u.id, e.target.value)} sx={{ minWidth: 80 }}>
+                                            <MenuItem value="free">Free</MenuItem>
+                                            <MenuItem value="pro">Pro</MenuItem>
+                                            <MenuItem value="admin">Admin</MenuItem>
+                                        </Select>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Chip size="small" label={u.is_active ? 'Active' : 'Disabled'} color={u.is_active ? 'success' : 'error'}
+                                            onClick={() => toggleUserActive(u.id, !u.is_active)} sx={{ cursor: 'pointer' }} />
+                                    </TableCell>
+                                    <TableCell>
+                                        <IconButton size="small" color="error" onClick={() => deleteUser(u.id)}><DeleteIcon fontSize="small" /></IconButton>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            )}
+
+            {tab === 1 && (
+                <TableContainer component={Card}>
+                    <Table size="small">
+                        <TableHead><TableRow>
+                            <TableCell>Name</TableCell><TableCell>Public</TableCell><TableCell>Status</TableCell><TableCell>Created</TableCell><TableCell>Actions</TableCell>
+                        </TableRow></TableHead>
+                        <TableBody>
+                            {datasets.map(d => (
+                                <TableRow key={d.id}>
+                                    <TableCell>{d.name}</TableCell>
+                                    <TableCell><Chip size="small" label={d.is_public ? 'Yes' : 'No'} /></TableCell>
+                                    <TableCell>{d.status}</TableCell>
+                                    <TableCell>{new Date(d.created_at).toLocaleDateString()}</TableCell>
+                                    <TableCell><IconButton size="small" color="error" onClick={() => deleteDataset(d.id)}><DeleteIcon fontSize="small" /></IconButton></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            )}
+
+            {tab === 2 && (
+                <TableContainer component={Card}>
+                    <Table size="small">
+                        <TableHead><TableRow>
+                            <TableCell>Name</TableCell><TableCell>Public</TableCell><TableCell>Stage</TableCell><TableCell>Created</TableCell><TableCell>Actions</TableCell>
+                        </TableRow></TableHead>
+                        <TableBody>
+                            {models.map(m => (
+                                <TableRow key={m.id}>
+                                    <TableCell>{m.name}</TableCell>
+                                    <TableCell><Chip size="small" label={m.is_public ? 'Yes' : 'No'} /></TableCell>
+                                    <TableCell>{m.stage}</TableCell>
+                                    <TableCell>{new Date(m.created_at).toLocaleDateString()}</TableCell>
+                                    <TableCell><IconButton size="small" color="error" onClick={() => deleteModel(m.id)}><DeleteIcon fontSize="small" /></IconButton></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            )}
+
+            {tab === 3 && (
+                <TableContainer component={Card}>
+                    <Table size="small">
+                        <TableHead><TableRow>
+                            <TableCell>Title</TableCell><TableCell>Upvotes</TableCell><TableCell>Created</TableCell><TableCell>Actions</TableCell>
+                        </TableRow></TableHead>
+                        <TableBody>
+                            {discussions.map(d => (
+                                <TableRow key={d.id}>
+                                    <TableCell>{d.title}</TableCell>
+                                    <TableCell>{d.upvotes}</TableCell>
+                                    <TableCell>{new Date(d.created_at).toLocaleDateString()}</TableCell>
+                                    <TableCell><IconButton size="small" color="error" onClick={() => deleteDiscussion(d.id)}><DeleteIcon fontSize="small" /></IconButton></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            )}
+        </Box>
+    )
+}

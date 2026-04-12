@@ -10,7 +10,13 @@ async def init_db():
     """Initialize MongoDB connection and Beanie ODM."""
     from app.models.models import (
         User, Dataset, TrainingJob, MLModel, 
-        Deployment, APIKey, InferenceLog, AuditLog
+        Deployment, APIKey, InferenceLog, AuditLog,
+        Subscription, UsageRecord, Invoice,
+        Discussion, Comment,
+        Star, Follow, Fork, Activity,
+        Notebook,
+        Competition, Submission,
+        Organization, OrgMembership,
     )
     import structlog
     import asyncio
@@ -37,19 +43,17 @@ async def init_db():
         client = AsyncMongoMockClient()
         database = client[settings.MONGODB_DB_NAME]
     
-
-    
     await init_beanie(
         database=database,
         document_models=[
-            User,
-            Dataset,
-            TrainingJob,
-            MLModel,
-            Deployment,
-            APIKey,
-            InferenceLog,
-            AuditLog,
+            User, Dataset, TrainingJob, MLModel,
+            Deployment, APIKey, InferenceLog, AuditLog,
+            Subscription, UsageRecord, Invoice,
+            Discussion, Comment,
+            Star, Follow, Fork, Activity,
+            Notebook,
+            Competition, Submission,
+            Organization, OrgMembership,
         ],
         allow_index_dropping=False
     )

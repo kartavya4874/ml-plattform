@@ -18,6 +18,15 @@ from app.api.v1.models_router import router as models_router
 from app.api.v1.inference import router as inference_router
 from app.api.v1.explain import router as explain_router
 from app.api.v1.deploy import router as deploy_router
+from app.api.v1.subscription import router as subscription_router
+from app.api.v1.community import router as community_router
+from app.api.v1.discussions import router as discussions_router
+from app.api.v1.social import router as social_router
+from app.api.v1.profiles import router as profiles_router
+from app.api.v1.notebooks import router as notebooks_router
+from app.api.v1.competitions import router as competitions_router
+from app.api.v1.organizations import router as organizations_router
+from app.api.v1.admin import router as admin_router
 
 log = structlog.get_logger()
 limiter = Limiter(key_func=get_remote_address)
@@ -44,7 +53,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="No-Code AI/ML Platform — train, explain, and deploy ML models without writing a single line of code.",
+    description="NexusML — train, explain, and deploy ML models without writing a single line of code.",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -78,6 +87,15 @@ app.include_router(models_router, prefix=prefix)
 app.include_router(inference_router, prefix=prefix)
 app.include_router(explain_router, prefix=prefix)
 app.include_router(deploy_router, prefix=prefix)
+app.include_router(subscription_router, prefix=prefix)
+app.include_router(community_router, prefix=prefix)
+app.include_router(discussions_router, prefix=prefix)
+app.include_router(social_router, prefix=prefix)
+app.include_router(profiles_router, prefix=prefix)
+app.include_router(notebooks_router, prefix=prefix)
+app.include_router(competitions_router, prefix=prefix)
+app.include_router(organizations_router, prefix=prefix)
+app.include_router(admin_router, prefix=prefix)
 
 # ── Global Exception Handler ───────────────────────────────────────────────────
 

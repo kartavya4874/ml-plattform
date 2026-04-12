@@ -3,6 +3,7 @@ import authReducer from './authSlice'
 import dataReducer from './dataSlice'
 import trainingReducer from './trainingSlice'
 import modelsReducer from './modelsSlice'
+import subscriptionReducer from './subscriptionSlice'
 
 export const store = configureStore({
     reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
         data: dataReducer,
         training: trainingReducer,
         models: modelsReducer,
+        subscription: subscriptionReducer,
     },
 })
 

@@ -34,52 +34,34 @@ export default function LoginPage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'radial-gradient(ellipse at 30% 20%, rgba(99,102,241,0.15) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(16,185,129,0.1) 0%, transparent 50%), #0A0A0F',
+            background: 'var(--bg)',
         }}>
-            {/* Decorative elements */}
-            <Box sx={{
-                position: 'absolute', top: '15%', right: '10%',
-                width: 200, height: 200, borderRadius: '50%',
-                background: 'rgba(99,102,241,0.06)',
-                filter: 'blur(40px)',
-            }} />
-            <Box sx={{
-                position: 'absolute', bottom: '20%', left: '5%',
-                width: 300, height: 300, borderRadius: '50%',
-                background: 'rgba(16,185,129,0.05)',
-                filter: 'blur(60px)',
-            }} />
 
             <Box sx={{
                 width: '100%', maxWidth: 420, mx: 2,
-                background: 'rgba(255,255,255,0.03)',
-                backdropFilter: 'blur(24px)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 4,
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 3,
                 p: 4,
                 position: 'relative',
+                boxShadow: 'none',
                 className: 'fade-in'
             }}>
-                {/* Logo */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 4 }}>
                     <Box sx={{
                         width: 44, height: 44, borderRadius: '12px',
-                        background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                        background: '#FAFAFA',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: '0 4px 20px rgba(99,102,241,0.4)',
                     }}>
-                        <LogoIcon sx={{ color: 'white', fontSize: 22 }} />
+                        <LogoIcon sx={{ color: '#000', fontSize: 22 }} />
                     </Box>
                     <Box>
-                        <Typography variant="h6" fontWeight={700}>NoCode AI Platform</Typography>
+                        <Typography variant="h6" fontWeight={700}>NexusML</Typography>
                         <Typography variant="caption" sx={{ color: 'text.secondary' }}>Train models without code</Typography>
                     </Box>
                 </Box>
 
-                <Typography variant="h4" fontWeight={800} mb={0.5} sx={{
-                    background: 'linear-gradient(135deg, #6366F1, #10B981)',
-                    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                }}>
+                <Typography variant="h4" fontWeight={700} mb={0.5} sx={{ color: 'text.primary' }}>
                     Welcome back
                 </Typography>
                 <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
