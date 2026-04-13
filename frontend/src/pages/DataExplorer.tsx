@@ -244,7 +244,8 @@ export default function DataExplorer() {
                                                     onClick={(e) => {
                                                         e.stopPropagation()
                                                         const token = localStorage.getItem('access_token')
-                                                        window.open(`http://localhost:8000/api/v1/data/datasets/${ds.id}/download?token=${token}`, '_blank')
+                                                        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+                                                        window.open(`${baseUrl}/data/datasets/${ds.id}/download?token=${token}`, '_blank')
                                                     }}
                                                 >
                                                     <DownloadIcon fontSize="small" />

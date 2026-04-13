@@ -106,7 +106,8 @@ export default function NotebookEditor() {
 
     const exportToIpynb = () => {
         if (!notebook) return
-        window.location.href = `http://localhost:8000/api/v1/notebooks/${notebook.id}/export`;
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+        window.location.href = `${baseUrl}/notebooks/${notebook.id}/export`;
     }
 
     // ── File management ─────────────────────────────────────────────────────

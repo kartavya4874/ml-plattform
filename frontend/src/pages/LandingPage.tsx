@@ -468,7 +468,7 @@ export default function LandingPage() {
                             <Typography variant="body1" fontWeight={800} letterSpacing="-0.5px">Parametrix AI</Typography>
                         </Box>
                         <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
-                            © {new Date().getFullYear()} Parametrix AI. All rights reserved. Built for the modern ML workflow.
+                            © {new Date().getFullYear()} Parametrix AI. All rights reserved. Made with ❤️ by Kartavya.
                         </Typography>
                     </Box>
                 </Container>

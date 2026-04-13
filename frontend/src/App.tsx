@@ -4,6 +4,8 @@ import type { RootState } from './store/store'
 import Layout from './components/Layout'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import Dashboard from './pages/Dashboard'
 import DataExplorer from './pages/DataExplorer'
 import TrainingStudio from './pages/TrainingStudio'
@@ -63,6 +65,8 @@ export default function App() {
       <Route path="/" element={<RootRoute />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
       {/* Protected routes — auth guard first, then layout shell */}
       <Route element={<RequireAuth />}>

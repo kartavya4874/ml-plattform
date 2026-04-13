@@ -234,6 +234,9 @@ export default function Layout() {
                             </IconButton>
                         </Tooltip>
                     </Box>
+                    <Typography variant="caption" sx={{ display: 'block', mt: 2, textAlign: 'center', color: 'text.secondary', fontSize: '10px', opacity: 0.6 }}>
+                        Made with ❤️ by Kartavya
+                    </Typography>
                 </Box>
             </Drawer>
 

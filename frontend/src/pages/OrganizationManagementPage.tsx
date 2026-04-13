@@ -73,7 +73,7 @@ export const OrganizationManagementPage: React.FC = () => {
             ) : (
               orgs.map((org) => (
                 <TableRow key={org.id}>
-                  <TableCell fontWeight="medium">{org.name}</TableCell>
+                  <TableCell sx={{ fontWeight: 'medium' }}>{org.name}</TableCell>
                   <TableCell><Chip label={org.slug} size="small" variant="outlined" /></TableCell>
                   <TableCell>1</TableCell>
                   <TableCell>{new Date(org.created_at).toLocaleDateString()}</TableCell>

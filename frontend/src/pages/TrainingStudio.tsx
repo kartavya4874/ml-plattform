@@ -5,12 +5,12 @@ import {
     Grid, Alert, Stepper, Step, StepLabel, CircularProgress,
     Slider, FormHelperText, FormControl, InputLabel, Select, MenuItem,
     Table, TableHead, TableRow, TableCell, TableBody, TableContainer, Tooltip,
-    IconButton, Collapse, Accordion, AccordionSummary, AccordionDetails,
-    Checkbox, FormControlLabel, TextField,
+    Collapse, Accordion, AccordionSummary, AccordionDetails,
+    Checkbox,
 } from '@mui/material'
 import {
     PlayArrow, TableChart, Image as ImgIcon, TextFields, CheckCircle,
-    Cancel as CancelIcon, Visibility, VisibilityOff, ArrowDropDown,
+    Cancel as CancelIcon, Visibility, VisibilityOff,
     ExpandMore as ExpandMoreIcon, Tune as TuneIcon, RestartAlt as ResetIcon,
 } from '@mui/icons-material'
 import { fetchDatasets } from '../store/dataSlice'
@@ -122,7 +122,8 @@ export default function TrainingStudio() {
         const token = localStorage.getItem('access_token')
         if (!token) return
 
-        const es = new EventSource(`http://localhost:8000/api/v1/training/jobs/${currentJob.id}/logs?token=${token}`)
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+        const es = new EventSource(`${baseUrl}/training/jobs/${currentJob.id}/logs?token=${token}`)
 
         es.onmessage = (e) => {
             try {
@@ -691,7 +692,7 @@ export default function TrainingStudio() {
                                 <Grid size={{ xs: 12, sm: 6 }}>
                                     <FormControl fullWidth size="small">
                                         <InputLabel>Cross Validation</InputLabel>
-                                        <Select value={crossValidation ?? ''} label="Cross Validation" onChange={e => setCrossValidation(e.target.value === '' ? null : Number(e.target.value))}>
+                                        <Select value={crossValidation ?? ''} label="Cross Validation" onChange={e => setCrossValidation((e.target.value as any) === '' ? null : Number(e.target.value))}>
                                             <MenuItem value="">None (faster)</MenuItem>
                                             <MenuItem value={3}>3-Fold</MenuItem>
                                             <MenuItem value={5}>5-Fold (recommended)</MenuItem>

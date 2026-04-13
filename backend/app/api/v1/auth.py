@@ -12,9 +12,10 @@ from app.core.security import (
 )
 from app.models.models import User
 from app.schemas.schemas import (
-    UserRegister, UserLogin, TokenResponse, RefreshRequest, UserOut, UserUpdate, UserPasswordUpdate
+    UserRegister, UserLogin, TokenResponse, RefreshRequest, UserOut, UserUpdate, UserPasswordUpdate,
+    UserForgotPassword, UserResetPassword
 )
-from app.services.email_service import send_verification_email
+from app.services.email_service import send_verification_email, send_password_reset_email
 from app.services.storage_service import StorageService
 import redis.asyncio as aioredis
 from app.core.config import settings
@@ -262,3 +263,48 @@ async def verify_email(token: str):
     await user.save()
     
     return {"message": "Email verified successfully"}
+
+
+@router.post("/forgot-password", status_code=200)
+@limiter.limit("5/minute")
+async def forgot_password(
+    request: Request,
+    body: UserForgotPassword,
+    background_tasks: BackgroundTasks,
+):
+    """Send a password reset email if the user exists."""
+    from datetime import datetime, timedelta, timezone
+    user = await User.find_one({"email": {"$regex": f"^{body.email}$", "$options": "i"}})
+    if not user:
+        # We still return 200 so we don't leak whether an email is registered
+        return {"message": "If that email is registered, a password reset link has been sent."}
+
+    # Generate token
+    reset_token = uuid.uuid4().hex
+    user.password_reset_token = reset_token
+    user.password_reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+    await user.save()
+
+    background_tasks.add_task(send_password_reset_email, user.email, reset_token)
+    return {"message": "If that email is registered, a password reset link has been sent."}
+
+
+@router.post("/reset-password", status_code=200)
+@limiter.limit("5/minute")
+async def reset_password(request: Request, body: UserResetPassword):
+    """Reset password using the secure token."""
+    from datetime import datetime, timezone
+    user = await User.find_one(User.password_reset_token == body.token)
+    
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+        
+    if not user.password_reset_expires or user.password_reset_expires < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Reset token has expired")
+
+    user.hashed_password = hash_password(body.new_password)
+    user.password_reset_token = None
+    user.password_reset_expires = None
+    await user.save()
+    
+    return {"message": "Password has been successfully reset"}

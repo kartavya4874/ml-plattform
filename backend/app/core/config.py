@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     CORS_ORIGINS: str | List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    FRONTEND_URL: str = "http://localhost:5173"
     ADMIN_USERS_SEED: str = "" # Comma separated list of email:password for initial superadmins
 
     # ── Database ─────────────────────────────────────────────────────────────
@@ -43,11 +44,8 @@ class Settings(BaseSettings):
 
 
     # ── Email ────────────────────────────────────────────────────────────────
-    SMTP_HOST: str = "smtp.gmail.com"
-    SMTP_PORT: int = 587
-    SMTP_USER: str = ""
-    SMTP_PASS: str = ""
-    EMAIL_FROM: str = "noreply@parametrix.in"
+    RESEND_API_KEY: str = ""
+    EMAIL_FROM: str = "support@parametrix.in"
 
     # ── File Limits (bytes) ──────────────────────────────────────────────────
     MAX_FILE_SIZE_FREE: int = 100 * 1024 * 1024        # 100 MB

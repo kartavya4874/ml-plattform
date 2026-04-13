@@ -52,7 +52,8 @@ export default function ModelDetail() {
 
     const handleDownload = () => {
         const token = localStorage.getItem('access_token')
-        window.open(`http://localhost:8000/api/v1/models/${id}/download?token=${token}`, '_blank')
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+        window.open(`${baseUrl}/models/${id}/download?token=${token}`, '_blank')
     }
 
     if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>

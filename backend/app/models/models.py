@@ -74,6 +74,8 @@ class User(Document):
     is_verified: bool = False
     is_2fa_enabled: bool = False
     verification_token: Optional[str] = None
+    password_reset_token: Optional[str] = None
+    password_reset_expires: Optional[datetime] = None
     slug: Indexed(str, unique=True)
     username: Optional[Indexed(str, unique=True)] = None
     avatar_url: Optional[str] = None

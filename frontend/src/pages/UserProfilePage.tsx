@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { Box, Typography, Avatar, Chip, Tabs, Tab, Card, Grid, Button, Link as MuiLink } from '@mui/material'
+import { Box, Typography, Avatar, Chip, Tabs, Tab, Card, Grid, Link as MuiLink } from '@mui/material'
 import { GitHub as GithubIcon, Language as WebIcon, Star as StarIcon, People as PeopleIcon } from '@mui/icons-material'
 import { api } from '../api/client'
 
@@ -78,8 +78,8 @@ export default function UserProfilePage() {
 
             {tab === 0 && (
                 <Grid container spacing={2}>
-                    {datasets.length === 0 ? <Grid item xs={12}><Typography color="text.secondary">No public datasets</Typography></Grid> : datasets.map(d => (
-                        <Grid item xs={12} md={6} key={d.id}>
+                    {datasets.length === 0 ? <Grid size={{ xs: 12 }}><Typography color="text.secondary">No public datasets</Typography></Grid> : datasets.map(d => (
+                        <Grid size={{ xs: 12, md: 6 }} key={d.id}>
                             <Card sx={{ p: 3 }}>
                                 <Typography variant="subtitle1" fontWeight={700}>{d.name}</Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{d.description || 'No description'}</Typography>
@@ -95,8 +95,8 @@ export default function UserProfilePage() {
 
             {tab === 1 && (
                 <Grid container spacing={2}>
-                    {models.length === 0 ? <Grid item xs={12}><Typography color="text.secondary">No public models</Typography></Grid> : models.map(m => (
-                        <Grid item xs={12} md={6} key={m.id}>
+                    {models.length === 0 ? <Grid size={{ xs: 12 }}><Typography color="text.secondary">No public models</Typography></Grid> : models.map(m => (
+                        <Grid size={{ xs: 12, md: 6 }} key={m.id}>
                             <Card sx={{ p: 3 }}>
                                 <Typography variant="subtitle1" fontWeight={700}>{m.name}</Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{m.description || 'No description'}</Typography>
@@ -112,8 +112,8 @@ export default function UserProfilePage() {
 
             {tab === 2 && (
                 <Grid container spacing={2}>
-                    {notebooks.length === 0 ? <Grid item xs={12}><Typography color="text.secondary">No public notebooks</Typography></Grid> : notebooks.map(n => (
-                        <Grid item xs={12} md={6} key={n.id}>
+                    {notebooks.length === 0 ? <Grid size={{ xs: 12 }}><Typography color="text.secondary">No public notebooks</Typography></Grid> : notebooks.map(n => (
+                        <Grid size={{ xs: 12, md: 6 }} key={n.id}>
                             <Card sx={{ p: 3 }}>
                                 <Typography variant="subtitle1" fontWeight={700}>{n.title}</Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{n.description || 'No description'}</Typography>

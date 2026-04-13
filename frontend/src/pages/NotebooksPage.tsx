@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Box, Typography, Card, Button, TextField, Tabs, Tab, Chip, IconButton, Divider } from '@mui/material'
-import { Add as AddIcon, PlayArrow as RunIcon, Delete as DeleteIcon, Code as CodeIcon, Description as MarkdownIcon } from '@mui/icons-material'
+import { Box, Typography, Card, Button, TextField, Chip } from '@mui/material'
+import { Add as AddIcon, Code as CodeIcon } from '@mui/icons-material'
 import { api } from '../api/client'
 
 interface NotebookItem { id: string; title: string; description: string | null; is_public: boolean; star_count: number; fork_count: number; created_at: string }

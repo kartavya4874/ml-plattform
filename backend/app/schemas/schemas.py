@@ -64,6 +64,29 @@ class UserPasswordUpdate(BaseModel):
         return v
 
 
+class UserForgotPassword(BaseModel):
+    email: EmailStr
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def lower_email(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.lower()
+        return v
+
+
+class UserResetPassword(BaseModel):
+    token: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str

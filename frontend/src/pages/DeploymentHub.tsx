@@ -46,7 +46,7 @@ export default function DeploymentHub() {
     const [error, setError] = useState<string | null>(null)
     const [usage, setUsage] = useState<any>(null)
 
-    const BASE = 'http://localhost:8000'
+    const BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api/v1', '') : 'http://localhost:8000'
 
     const handleDeploy = async () => {
         setDeploying(true)
