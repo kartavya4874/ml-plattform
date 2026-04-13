@@ -28,37 +28,31 @@ async def init_db():
     # Try connecting to actual MongoDB first
     client = AsyncIOMotorClient(settings.MONGODB_URL, serverSelectionTimeoutMS=2000)
     
+    document_models = [
+        User, Dataset, TrainingJob, MLModel,
+        Deployment, APIKey, InferenceLog, AuditLog,
+        Subscription, UsageRecord, Invoice,
+        Discussion, Comment,
+        Star, Follow, Fork, Activity,
+        Notebook,
+        Competition, Submission,
+        Organization, OrgMembership,
+        Notification,
+    ]
+
     try:
-        # Force a call to test the connection (2 second timeout)
+        # Force a call to test the connection (5 second timeout)
         await client.admin.command('ping')
         log.info("database.connected", url=settings.MONGODB_URL)
         database = client[settings.MONGODB_DB_NAME]
+        await init_beanie(database=database, document_models=document_models, allow_index_dropping=False)
     except Exception as exc:
         log.warning(
             "database.unavailable",
             error=str(exc),
-            hint="Falling back to in-memory mongomock_motor database for local testing."
+            hint=f"Start MongoDB on {settings.MONGODB_URL} for DB-dependent endpoints to work.",
         )
-        # Fallback to in-memory mock if no local db is running
-        from mongomock_motor import AsyncMongoMockClient
-        client = AsyncMongoMockClient()
-        database = client[settings.MONGODB_DB_NAME]
-    
-    await init_beanie(
-        database=database,
-        document_models=[
-            User, Dataset, TrainingJob, MLModel,
-            Deployment, APIKey, InferenceLog, AuditLog,
-            Subscription, UsageRecord, Invoice,
-            Discussion, Comment,
-            Star, Follow, Fork, Activity,
-            Notebook,
-            Competition, Submission,
-            Organization, OrgMembership,
-            Notification,
-        ],
-        allow_index_dropping=False
-    )
+        raise
     
     await seed_admins_from_env()
 
