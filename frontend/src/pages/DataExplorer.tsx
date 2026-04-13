@@ -5,7 +5,7 @@ import { useDropzone } from 'react-dropzone'
 import {
     Box, Typography, Card, Chip, LinearProgress,
     Table, TableBody, TableCell, TableHead, TableRow,
-    IconButton, Tooltip, Alert, CircularProgress
+    IconButton, Tooltip, Alert, CircularProgress, Snackbar, Button
 } from '@mui/material'
 import {
     CloudUpload as UploadIcon,
@@ -19,6 +19,8 @@ import {
     Build as TransformIcon,
     Public as PublicIcon,
     Lock as PrivateIcon,
+    AutoFixHigh as AutoFixIcon,
+    Download as DownloadIcon,
 } from '@mui/icons-material'
 import { fetchDatasets, deleteDataset, uploadDataset } from '../store/dataSlice'
 import { api } from '../api/client'
@@ -54,6 +56,8 @@ export default function DataExplorer() {
     const navigate = useNavigate()
     const { datasets, loading, uploading, error } = useSelector((s: RootState) => s.data)
     const [progress, setProgress] = useState(0)
+    const [autoFixing, setAutoFixing] = useState<string | null>(null)
+    const [snackMsg, setSnackMsg] = useState<string | null>(null)
 
     useEffect(() => { dispatch(fetchDatasets()) }, [dispatch])
 
@@ -207,6 +211,42 @@ export default function DataExplorer() {
                                                     <EdaIcon fontSize="small" />
                                                 </IconButton>
                                             </Tooltip>
+                                            {ds.dataset_type === 'tabular' && (
+                                                <Tooltip title="Auto-fix: fill nulls, remove duplicates">
+                                                    <IconButton
+                                                        size="small"
+                                                        sx={{ color: '#10B981' }}
+                                                        disabled={autoFixing === ds.id}
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation()
+                                                            setAutoFixing(ds.id)
+                                                            try {
+                                                                const res = await api.post(`/data/datasets/${ds.id}/auto-fix`)
+                                                                setSnackMsg(res.data.message)
+                                                                dispatch(fetchDatasets())
+                                                            } catch (err: any) {
+                                                                setSnackMsg(err.response?.data?.detail || 'Auto-fix failed')
+                                                            }
+                                                            setAutoFixing(null)
+                                                        }}
+                                                    >
+                                                        {autoFixing === ds.id ? <CircularProgress size={16} /> : <AutoFixIcon fontSize="small" />}
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
+                                            <Tooltip title="Download">
+                                                <IconButton
+                                                    size="small"
+                                                    sx={{ color: '#8B5CF6' }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        const token = localStorage.getItem('access_token')
+                                                        window.open(`http://localhost:8000/api/v1/data/datasets/${ds.id}/download?token=${token}`, '_blank')
+                                                    }}
+                                                >
+                                                    <DownloadIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
                                             <Tooltip title="Delete dataset">
                                                 <IconButton
                                                     size="small"
@@ -224,6 +264,8 @@ export default function DataExplorer() {
                     </Table>
                 </Card>
             )}
+
+            <Snackbar open={!!snackMsg} autoHideDuration={5000} onClose={() => setSnackMsg(null)} message={snackMsg} />
         </Box>
     )
 }

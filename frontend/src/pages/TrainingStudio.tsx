@@ -5,11 +5,13 @@ import {
     Grid, Alert, Stepper, Step, StepLabel, CircularProgress,
     Slider, FormHelperText, FormControl, InputLabel, Select, MenuItem,
     Table, TableHead, TableRow, TableCell, TableBody, TableContainer, Tooltip,
-    IconButton, Collapse,
+    IconButton, Collapse, Accordion, AccordionSummary, AccordionDetails,
+    Checkbox, FormControlLabel, TextField,
 } from '@mui/material'
 import {
     PlayArrow, TableChart, Image as ImgIcon, TextFields, CheckCircle,
     Cancel as CancelIcon, Visibility, VisibilityOff, ArrowDropDown,
+    ExpandMore as ExpandMoreIcon, Tune as TuneIcon, RestartAlt as ResetIcon,
 } from '@mui/icons-material'
 import { fetchDatasets } from '../store/dataSlice'
 import { fetchJobs, submitJob, cancelJob, appendLog, setProgress, resetLive } from '../store/trainingSlice'
@@ -66,6 +68,15 @@ export default function TrainingStudio() {
     const [loadingProfile, setLoadingProfile] = useState(false)
     const [showPreview, setShowPreview] = useState(false)
     const [columnNames, setColumnNames] = useState<string[]>([])
+
+    // Advanced hyperparameters
+    const [algorithm, setAlgorithm] = useState('auto')
+    const [nEstimators, setNEstimators] = useState(100)
+    const [maxDepth, setMaxDepth] = useState<number | null>(null)
+    const [learningRate, setLearningRate] = useState(0.1)
+    const [testSize, setTestSize] = useState(0.2)
+    const [crossValidation, setCrossValidation] = useState<number | null>(null)
+    const [excludedCols, setExcludedCols] = useState<string[]>([])
 
     useEffect(() => { dispatch(fetchDatasets()); dispatch(fetchJobs()); }, [dispatch])
 
@@ -139,12 +150,43 @@ export default function TrainingStudio() {
         const payload: any = {
             dataset_id: datasetId,
             task_type: taskType,
-            config: { time_limit_seconds: timeLimit },
+            config: {
+                time_limit_seconds: timeLimit,
+                algorithm,
+                n_estimators: nEstimators,
+                max_depth: maxDepth,
+                learning_rate: learningRate,
+                test_size: testSize,
+                cross_validation: crossValidation,
+                excluded_columns: excludedCols,
+            },
         }
         if (isTabular && targetColumn) payload.target_column = targetColumn
         const result = await dispatch(submitJob(payload))
         if (submitJob.fulfilled.match(result)) setStep(2)
     }
+
+    const resetAdvanced = () => {
+        setAlgorithm('auto'); setNEstimators(100); setMaxDepth(null)
+        setLearningRate(0.1); setTestSize(0.2); setCrossValidation(null)
+        setExcludedCols([])
+    }
+
+    const toggleExcludeCol = (col: string) => {
+        setExcludedCols(prev => prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col])
+    }
+
+    // Auto-detect task type suggestion
+    const suggestedTaskType = (() => {
+        if (!targetColumn || !columnsMeta[targetColumn]) return null
+        const meta = columnsMeta[targetColumn]
+        if (meta.dtype?.includes('float') || meta.dtype?.includes('int')) {
+            if (meta.unique_count && meta.unique_count <= 10) return 'classification'
+            return 'regression'
+        }
+        if (meta.dtype?.includes('object') || meta.dtype?.includes('str')) return 'classification'
+        return null
+    })()
 
     return (
         <Box className="fade-in">
@@ -521,6 +563,14 @@ export default function TrainingStudio() {
                         </FormControl>
                     )}
 
+                    {/* Auto-detect task type hint */}
+                    {suggestedTaskType && !taskType && (
+                        <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+                            Based on your target column, we suggest <strong>{suggestedTaskType}</strong>.{' '}
+                            <Button size="small" onClick={() => setTaskType(suggestedTaskType)}>Use suggestion</Button>
+                        </Alert>
+                    )}
+
                     <Typography variant="body2" fontWeight={600} mb={1}>Time Budget: {timeLimit}s</Typography>
                     <Slider
                         value={timeLimit}
@@ -536,6 +586,169 @@ export default function TrainingStudio() {
                         sx={{ mb: 3 }}
                     />
                     <FormHelperText>Longer time budgets typically yield better models</FormHelperText>
+
+                    {/* Feature Column Selection */}
+                    {isTabular && columnNames.length > 0 && targetColumn && (
+                        <Box sx={{ mt: 3, mb: 2 }}>
+                            <Typography variant="subtitle2" fontWeight={700} mb={1}>
+                                📋 Feature Columns ({columnNames.filter(c => c !== targetColumn && !excludedCols.includes(c)).length} selected)
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                                Uncheck columns you don't want to use as features (e.g. IDs, names, dates that shouldn't predict the target)
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                {columnNames.filter(c => c !== targetColumn).map(col => {
+                                    const meta = columnsMeta[col]
+                                    const isExcluded = excludedCols.includes(col)
+                                    const isIdLike = meta && meta.unique_count === (selectedDataset?.row_count || 0)
+                                    const color = dtypeColor(meta?.dtype || '')
+                                    return (
+                                        <Chip
+                                            key={col}
+                                            label={
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                    <Checkbox
+                                                        checked={!isExcluded}
+                                                        onChange={() => toggleExcludeCol(col)}
+                                                        size="small"
+                                                        sx={{ p: 0, mr: 0.5 }}
+                                                    />
+                                                    <span>{col}</span>
+                                                    {isIdLike && !isExcluded && (
+                                                        <Tooltip title="This column has all unique values — it might be an ID column">
+                                                            <Box component="span" sx={{ fontSize: 12 }}>⚠️</Box>
+                                                        </Tooltip>
+                                                    )}
+                                                </Box>
+                                            }
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={() => toggleExcludeCol(col)}
+                                            sx={{
+                                                opacity: isExcluded ? 0.4 : 1,
+                                                textDecoration: isExcluded ? 'line-through' : 'none',
+                                                borderColor: isExcluded ? '#6B728030' : `${color}40`,
+                                                cursor: 'pointer',
+                                            }}
+                                        />
+                                    )
+                                })}
+                            </Box>
+                            {excludedCols.length > 0 && (
+                                <Typography variant="caption" sx={{ color: '#F59E0B', mt: 1, display: 'block' }}>
+                                    ⚠ {excludedCols.length} column(s) excluded from training
+                                </Typography>
+                            )}
+                        </Box>
+                    )}
+
+                    {/* Advanced Settings Accordion */}
+                    <Accordion
+                        sx={{ mt: 2, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px !important', '&:before': { display: 'none' } }}
+                        disableGutters
+                    >
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <TuneIcon fontSize="small" sx={{ color: '#6366F1' }} />
+                                <Typography variant="body2" fontWeight={600}>Advanced Settings</Typography>
+                                <Typography variant="caption" color="text.secondary">(optional)</Typography>
+                            </Box>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                                <Button size="small" startIcon={<ResetIcon />} onClick={resetAdvanced} sx={{ fontSize: 11 }}>Reset to Defaults</Button>
+                            </Box>
+                            <Grid container spacing={3}>
+                                {/* Algorithm Selection */}
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Algorithm</InputLabel>
+                                        <Select value={algorithm} label="Algorithm" onChange={e => setAlgorithm(e.target.value)}>
+                                            <MenuItem value="auto">🤖 Auto (try all, pick best)</MenuItem>
+                                            {isTabular && taskType === 'regression' ? (
+                                                [
+                                                    <MenuItem key="lr" value="linear_regression">Linear Regression</MenuItem>,
+                                                    <MenuItem key="rf" value="random_forest">Random Forest</MenuItem>,
+                                                    <MenuItem key="gb" value="gradient_boosting">Gradient Boosting</MenuItem>,
+                                                    <MenuItem key="svm" value="svm">SVR (Support Vector)</MenuItem>,
+                                                    <MenuItem key="knn" value="knn">KNN (K-Nearest Neighbors)</MenuItem>,
+                                                ]
+                                            ) : (
+                                                [
+                                                    <MenuItem key="lr" value="logistic_regression">Logistic Regression</MenuItem>,
+                                                    <MenuItem key="rf" value="random_forest">Random Forest</MenuItem>,
+                                                    <MenuItem key="gb" value="gradient_boosting">Gradient Boosting</MenuItem>,
+                                                    <MenuItem key="svm" value="svm">SVM (Support Vector Machine)</MenuItem>,
+                                                    <MenuItem key="knn" value="knn">KNN (K-Nearest Neighbors)</MenuItem>,
+                                                ]
+                                            )}
+                                        </Select>
+                                        <FormHelperText>Auto tries multiple algorithms and picks the best one</FormHelperText>
+                                    </FormControl>
+                                </Grid>
+
+                                {/* Cross Validation */}
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Cross Validation</InputLabel>
+                                        <Select value={crossValidation ?? ''} label="Cross Validation" onChange={e => setCrossValidation(e.target.value === '' ? null : Number(e.target.value))}>
+                                            <MenuItem value="">None (faster)</MenuItem>
+                                            <MenuItem value={3}>3-Fold</MenuItem>
+                                            <MenuItem value={5}>5-Fold (recommended)</MenuItem>
+                                            <MenuItem value={10}>10-Fold (thorough)</MenuItem>
+                                        </Select>
+                                        <FormHelperText>Validates model performance across multiple data splits</FormHelperText>
+                                    </FormControl>
+                                </Grid>
+
+                                {/* N Estimators */}
+                                {['random_forest', 'gradient_boosting', 'auto'].includes(algorithm) && (
+                                    <Grid size={{ xs: 12, sm: 6 }}>
+                                        <Typography variant="caption" fontWeight={600}>Number of Trees: {nEstimators}</Typography>
+                                        <Slider value={nEstimators} min={10} max={500} step={10}
+                                            onChange={(_: Event, v: number | number[]) => setNEstimators(v as number)}
+                                            marks={[{ value: 10, label: '10' }, { value: 100, label: '100' }, { value: 500, label: '500' }]}
+                                        />
+                                        <FormHelperText>More trees = better accuracy but slower training</FormHelperText>
+                                    </Grid>
+                                )}
+
+                                {/* Max Depth */}
+                                {['random_forest', 'gradient_boosting', 'auto'].includes(algorithm) && (
+                                    <Grid size={{ xs: 12, sm: 6 }}>
+                                        <Typography variant="caption" fontWeight={600}>Max Tree Depth: {maxDepth ?? 'Unlimited'}</Typography>
+                                        <Slider value={maxDepth ?? 0} min={0} max={50} step={1}
+                                            onChange={(_: Event, v: number | number[]) => setMaxDepth((v as number) === 0 ? null : v as number)}
+                                            marks={[{ value: 0, label: 'Auto' }, { value: 10, label: '10' }, { value: 50, label: '50' }]}
+                                        />
+                                        <FormHelperText>Limit tree depth to prevent overfitting (0 = unlimited)</FormHelperText>
+                                    </Grid>
+                                )}
+
+                                {/* Learning Rate */}
+                                {['gradient_boosting', 'auto'].includes(algorithm) && (
+                                    <Grid size={{ xs: 12, sm: 6 }}>
+                                        <Typography variant="caption" fontWeight={600}>Learning Rate: {learningRate}</Typography>
+                                        <Slider value={learningRate} min={0.001} max={1} step={0.01}
+                                            onChange={(_: Event, v: number | number[]) => setLearningRate(v as number)}
+                                            marks={[{ value: 0.01, label: '0.01' }, { value: 0.1, label: '0.1' }, { value: 1, label: '1.0' }]}
+                                        />
+                                        <FormHelperText>Smaller = more precise but slower; larger = faster but may overshoot</FormHelperText>
+                                    </Grid>
+                                )}
+
+                                {/* Test Size */}
+                                <Grid size={{ xs: 12, sm: 6 }}>
+                                    <Typography variant="caption" fontWeight={600}>Test Split: {(testSize * 100).toFixed(0)}%</Typography>
+                                    <Slider value={testSize} min={0.1} max={0.4} step={0.05}
+                                        onChange={(_: Event, v: number | number[]) => setTestSize(v as number)}
+                                        marks={[{ value: 0.1, label: '10%' }, { value: 0.2, label: '20%' }, { value: 0.4, label: '40%' }]}
+                                    />
+                                    <FormHelperText>Percentage of data reserved for testing (not used in training)</FormHelperText>
+                                </Grid>
+                            </Grid>
+                        </AccordionDetails>
+                    </Accordion>
 
                     <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
                         <Button variant="outlined" onClick={() => setStep(0)}>← Back</Button>

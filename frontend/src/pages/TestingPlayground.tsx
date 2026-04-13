@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
     Box, Typography, Card, CardContent, Button, TextField, CircularProgress,
     Alert, LinearProgress, Chip, IconButton, Tooltip, Grid, Divider,
+    Tab, Tabs, Table, TableHead, TableRow, TableCell, TableBody, TableContainer,
 } from '@mui/material'
-import { PlayArrow, ArrowBack, History as HistoryIcon } from '@mui/icons-material'
+import { PlayArrow, ArrowBack, History as HistoryIcon, UploadFile as UploadIcon, Download as DownloadIcon } from '@mui/icons-material'
 import { api } from '../api/client'
 
 interface FeatureInfo {
@@ -25,6 +26,10 @@ export default function TestingPlayground() {
     const [featuresLoading, setFeaturesLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [history, setHistory] = useState<any[]>([])
+    const [tab, setTab] = useState(0) // 0=single, 1=batch
+    const [batchResults, setBatchResults] = useState<any[]>([])
+    const [batchLoading, setBatchLoading] = useState(false)
+    const [batchFile, setBatchFile] = useState<File | null>(null)
 
     // Load feature names from the model
     useEffect(() => {
@@ -94,6 +99,12 @@ export default function TestingPlayground() {
                 </Box>
             </Box>
 
+            <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, '& .MuiTab-root': { textTransform: 'none', fontWeight: 600 } }}>
+                <Tab label="Single Prediction" />
+                <Tab label="Batch Prediction (CSV)" />
+            </Tabs>
+
+            {tab === 0 ? (
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
                 {/* Input Panel — individual fields for each feature */}
                 <Card sx={{ borderRadius: '14px' }}>
@@ -266,6 +277,123 @@ export default function TestingPlayground() {
                     )}
                 </Box>
             </Box>
+            ) : (
+            /* Batch Prediction Tab */
+            <Box>
+                <Card sx={{ mb: 3 }}>
+                    <CardContent sx={{ p: 3 }}>
+                        <Typography variant="h6" fontWeight={700} mb={1}>Batch Prediction</Typography>
+                        <Typography variant="body2" color="text.secondary" mb={2}>
+                            Upload a CSV file with the same columns as your training data. Each row will get a prediction.
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                            <Button variant="outlined" component="label" startIcon={<UploadIcon />}>
+                                {batchFile ? batchFile.name : 'Choose CSV'}
+                                <input type="file" hidden accept=".csv" onChange={e => setBatchFile(e.target.files?.[0] || null)} />
+                            </Button>
+                            <Button
+                                variant="contained"
+                                disabled={!batchFile || batchLoading}
+                                startIcon={batchLoading ? <CircularProgress size={16} color="inherit" /> : <PlayArrow />}
+                                onClick={async () => {
+                                    if (!batchFile || !id) return
+                                    setBatchLoading(true); setError(null); setBatchResults([])
+                                    try {
+                                        const text = await batchFile.text()
+                                        const lines = text.trim().split('\n')
+                                        const headers = lines[0].split(',')
+                                        const rows = lines.slice(1).map(line => {
+                                            const vals = line.split(',')
+                                            const obj: Record<string, any> = {}
+                                            headers.forEach((h, i) => {
+                                                const v = vals[i]?.trim()
+                                                const num = Number(v)
+                                                obj[h.trim()] = isNaN(num) || v === '' ? v : num
+                                            })
+                                            return obj
+                                        })
+                                        const results = []
+                                        for (const row of rows) {
+                                            try {
+                                                const { data } = await api.post(`/inference/${id}/predict`, { inputs: row })
+                                                results.push({ ...row, __prediction: data.prediction, __confidence: data.confidence })
+                                            } catch {
+                                                results.push({ ...row, __prediction: 'ERROR', __confidence: null })
+                                            }
+                                        }
+                                        setBatchResults(results)
+                                    } catch (e: any) {
+                                        setError('Failed to parse CSV')
+                                    }
+                                    setBatchLoading(false)
+                                }}
+                            >
+                                {batchLoading ? `Processing...` : 'Run Batch'}
+                            </Button>
+                        </Box>
+                        {batchLoading && <LinearProgress sx={{ mt: 2 }} />}
+                    </CardContent>
+                </Card>
+
+                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+                {batchResults.length > 0 && (
+                    <Card>
+                        <CardContent sx={{ p: 2 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                <Typography variant="subtitle2" fontWeight={700}>{batchResults.length} Predictions</Typography>
+                                <Button size="small" startIcon={<DownloadIcon />}
+                                    onClick={() => {
+                                        const keys = Object.keys(batchResults[0])
+                                        const csv = [keys.join(','), ...batchResults.map(r => keys.map(k => r[k] ?? '').join(','))].join('\n')
+                                        const blob = new Blob([csv], { type: 'text/csv' })
+                                        const url = URL.createObjectURL(blob)
+                                        const a = document.createElement('a'); a.href = url; a.download = 'predictions.csv'; a.click()
+                                    }}
+                                >Download Results</Button>
+                            </Box>
+                            <TableContainer sx={{ maxHeight: 400 }}>
+                                <Table size="small" stickyHeader>
+                                    <TableHead>
+                                        <TableRow>
+                                            {Object.keys(batchResults[0]).map(k => (
+                                                <TableCell key={k} sx={{
+                                                    fontWeight: 700, fontSize: 11,
+                                                    background: k.startsWith('__') ? 'rgba(16,185,129,0.1)' : undefined,
+                                                    color: k === '__prediction' ? '#10B981' : k === '__confidence' ? '#6366F1' : undefined,
+                                                }}>
+                                                    {k.replace('__', '')}
+                                                </TableCell>
+                                            ))}
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {batchResults.slice(0, 100).map((row, i) => (
+                                            <TableRow key={i}>
+                                                {Object.entries(row).map(([k, v]) => (
+                                                    <TableCell key={k} sx={{
+                                                        fontSize: 12,
+                                                        fontWeight: k === '__prediction' ? 700 : 400,
+                                                        color: k === '__prediction' ? '#10B981' : undefined,
+                                                    }}>
+                                                        {v != null ? String(v) : ''}
+                                                    </TableCell>
+                                                ))}
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                            {batchResults.length > 100 && (
+                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                    Showing first 100 of {batchResults.length} rows. Download for complete results.
+                                </Typography>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+            </Box>
+            )}
         </Box>
     )
 }

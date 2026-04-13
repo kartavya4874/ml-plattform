@@ -2,7 +2,9 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
+/* ── Dark theme (default) ──────────────────────────────────────────────────── */
+:root,
+[data-theme="dark"] {
   --indigo: #6366F1;
   --emerald: #10B981;
   --bg: #000000;
@@ -10,6 +12,25 @@
   --border: #222222;
   --text: #F9FAFB;
   --text-muted: #A1A1AA;
+  --hover-bg: #1A1A1A;
+  --active-bg: #222222;
+  --scrollbar-thumb: #333333;
+  --scrollbar-thumb-hover: #555555;
+}
+
+/* ── Light theme ───────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --indigo: #6366F1;
+  --emerald: #10B981;
+  --bg: #FAFAFA;
+  --surface: #FFFFFF;
+  --border: #E4E4E7;
+  --text: #18181B;
+  --text-muted: #71717A;
+  --hover-bg: #F4F4F5;
+  --active-bg: #E4E4E7;
+  --scrollbar-thumb: #D4D4D8;
+  --scrollbar-thumb-hover: #A1A1AA;
 }
 
 html { scroll-behavior: smooth; }
@@ -19,13 +40,14 @@ body {
   background: var(--bg);
   color: var(--text);
   overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #333333; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #555555; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
 /* Animated background fallback - replaced with solid */
 .bg-animated {
@@ -54,7 +76,7 @@ body {
 }
 
 .skeleton {
-  background: #222222;
+  background: var(--border);
   animation: shimmer 1.5s infinite ease-in-out;
   border-radius: 6px;
 }
@@ -83,7 +105,7 @@ body {
   transition: border-color 0.15s ease;
 }
 .metric-card:hover {
-  border-color: #444444;
+  border-color: var(--text-muted);
 }
 
 /* Training step wizard */
@@ -98,17 +120,17 @@ body {
   transition: all 0.15s;
 }
 .wizard-step.active {
-  background: #18181A;
-  border: 1px solid #333333;
+  background: var(--surface);
+  border: 1px solid var(--border);
 }
 .wizard-step.completed {
   background: transparent;
-  color: #A1A1AA;
+  color: var(--text-muted);
 }
 
 /* Dropzone */
 .dropzone {
-  border: 1px dashed #444444;
+  border: 1px dashed var(--text-muted);
   border-radius: 12px;
   padding: 60px 40px;
   text-align: center;
@@ -117,7 +139,7 @@ body {
   background: var(--surface);
 }
 .dropzone:hover, .dropzone.active {
-  border-color: #888888;
+  border-color: var(--text);
 }
 
 /* Sidebar nav item */
@@ -134,8 +156,8 @@ body {
   font-weight: 500;
   font-size: 14px;
 }
-.nav-item:hover { background: #1A1A1A; color: var(--text); }
+.nav-item:hover { background: var(--hover-bg); color: var(--text); }
 .nav-item.active {
-  background: #222222;
+  background: var(--active-bg);
   color: var(--text);
 }

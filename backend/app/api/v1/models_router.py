@@ -150,3 +150,35 @@ async def promote_model(
     model.stage = ModelStage.production
     await model.save()
     return model
+
+
+@router.get("/{model_id}/download")
+async def download_model(
+    model_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+):
+    """Download the trained model artifact (.pkl file)."""
+    from fastapi.responses import Response
+    from app.services.storage_service import StorageService
+    from app.core.config import settings
+
+    model = await MLModel.get(model_id)
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+    _check_model_access(model, current_user)
+
+    if not model.artifact_path:
+        raise HTTPException(status_code=404, detail="No artifact available for this model")
+
+    storage = await StorageService.get_instance()
+    try:
+        data = await storage.download_bytes(settings.MINIO_BUCKET_MODELS, model.artifact_path)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to retrieve model artifact from storage")
+
+    filename = f"{model.name.replace(' ', '_')}.pkl"
+    return Response(
+        content=data,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

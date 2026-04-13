@@ -1,8 +1,9 @@
-"""Notebook routes — /api/v1/notebooks/ (Colab-style with venvs)"""
+"""Notebook routes — /api/v1/notebooks/ (Colab-style with system Python + optional venvs)"""
 import uuid
 import subprocess
 import tempfile
 import os
+import sys
 import shutil
 from pathlib import Path
 from typing import Any, Optional, List
@@ -20,11 +21,15 @@ router = APIRouter(prefix="/notebooks", tags=["Notebooks"])
 NOTEBOOKS_DIR = Path(os.environ.get("NOTEBOOKS_DIR", "./notebook_workspaces"))
 NOTEBOOKS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Pre-installed packages for every notebook venv
-PREINSTALLED_PACKAGES = [
+# These packages are available from the system/backend Python environment
+# No per-notebook venv is created for them — they're globally available.
+GLOBAL_PACKAGES = [
     "numpy", "pandas", "scikit-learn", "matplotlib", "seaborn",
     "scipy", "statsmodels", "pillow", "requests",
 ]
+
+# Per-notebook venvs are only created when user explicitly installs extra packages
+# via the "Install Packages" dialog. Until then, system Python is used.
 
 
 class NotebookCreate(BaseModel):
@@ -79,35 +84,48 @@ def _get_workspace(notebook_id: uuid.UUID) -> Path:
     return ws
 
 
-def _get_venv_python(notebook_id: uuid.UUID) -> str:
-    """Get the Python binary path for a notebook's venv."""
+def _get_python_path(notebook_id: uuid.UUID) -> str:
+    """Get the Python binary to use for this notebook.
+    
+    Uses system Python by default. If a per-notebook venv exists
+    (created when user installs extra packages), use that instead.
+    """
     ws = _get_workspace(notebook_id)
     venv_dir = ws / "venv"
+    
+    if venv_dir.exists():
+        # Per-notebook venv exists — use it
+        if os.name == "nt":
+            venv_python = venv_dir / "Scripts" / "python.exe"
+        else:
+            venv_python = venv_dir / "bin" / "python"
+        if venv_python.exists():
+            return str(venv_python)
+    
+    # Use the same Python that's running the backend
+    # This has numpy, pandas, scikit-learn, etc. already installed
+    return sys.executable
+
+
+def _create_venv_if_needed(notebook_id: uuid.UUID) -> str:
+    """Create a per-notebook venv only when user wants to install extra packages.
+    
+    The venv inherits system site-packages so numpy/pandas/sklearn etc. are
+    available without reinstalling. Only extra packages are installed per-notebook.
+    """
+    ws = _get_workspace(notebook_id)
+    venv_dir = ws / "venv"
+    
+    if not venv_dir.exists():
+        # Create venv WITH --system-site-packages so global packages are available
+        subprocess.run(
+            [sys.executable, "-m", "venv", "--system-site-packages", str(venv_dir)],
+            capture_output=True, text=True, timeout=120,
+        )
+    
     if os.name == "nt":
         return str(venv_dir / "Scripts" / "python.exe")
     return str(venv_dir / "bin" / "python")
-
-
-def _ensure_venv(notebook_id: uuid.UUID) -> str:
-    """Create venv if it doesn't exist, install pre-requisites."""
-    ws = _get_workspace(notebook_id)
-    venv_dir = ws / "venv"
-    python_path = _get_venv_python(notebook_id)
-
-    if not venv_dir.exists():
-        # Create venv
-        subprocess.run(
-            ["python", "-m", "venv", str(venv_dir)],
-            capture_output=True, text=True, timeout=120,
-        )
-        # Install pre-requisites
-        pip_path = str(venv_dir / ("Scripts" if os.name == "nt" else "bin") / "pip")
-        subprocess.run(
-            [pip_path, "install", "--quiet"] + PREINSTALLED_PACKAGES,
-            capture_output=True, text=True, timeout=300,
-        )
-
-    return python_path
 
 
 # ── CRUD ─────────────────────────────────────────────────────────────────────
@@ -173,7 +191,7 @@ async def delete_notebook(notebook_id: uuid.UUID, current_user: User = Depends(g
 
 @router.post("/{notebook_id}/execute", response_model=CellExecuteResponse)
 async def execute_cell(notebook_id: uuid.UUID, body: CellExecuteRequest, current_user: User = Depends(get_current_user)):
-    """Execute a single code cell in the notebook's private venv."""
+    """Execute a single code cell using system Python (or notebook venv if extra packages installed)."""
     nb = await Notebook.get(notebook_id)
     if not nb:
         raise HTTPException(404, "Notebook not found")
@@ -182,7 +200,7 @@ async def execute_cell(notebook_id: uuid.UUID, body: CellExecuteRequest, current
 
     timeout = nb.runtime_config.get("timeout_seconds", 30)
     ws = _get_workspace(notebook_id)
-    python_path = _ensure_venv(notebook_id)
+    python_path = _get_python_path(notebook_id)
 
     # Write code to a temp file inside the workspace (so imports work)
     code_file = ws / f"_cell_{body.cell_index}.py"
@@ -200,11 +218,15 @@ async def execute_cell(notebook_id: uuid.UUID, body: CellExecuteRequest, current
             outputs.append({"type": "text", "content": result.stdout})
         error = result.stderr if result.returncode != 0 else None
         if result.stderr and result.returncode == 0:
+            # Warnings from libraries — show but don't treat as error
             outputs.append({"type": "stderr", "content": result.stderr})
             error = None
     except subprocess.TimeoutExpired:
         outputs = []
         error = f"Execution timed out after {timeout}s"
+    except FileNotFoundError:
+        outputs = []
+        error = f"Python interpreter not found: {python_path}"
     finally:
         # Clean up temp cell file (keep user files)
         if code_file.exists():
@@ -226,14 +248,20 @@ async def execute_cell(notebook_id: uuid.UUID, body: CellExecuteRequest, current
 
 @router.post("/{notebook_id}/install")
 async def install_packages(notebook_id: uuid.UUID, body: InstallRequest, current_user: User = Depends(get_current_user)):
-    """Install Python packages into the notebook's private venv."""
+    """Install Python packages into a per-notebook venv.
+    
+    Creates the venv on first call with --system-site-packages so that
+    global packages (numpy, pandas, sklearn, etc.) are inherited.
+    Only the extra packages are pip-installed into the venv.
+    """
     nb = await Notebook.get(notebook_id)
     if not nb:
         raise HTTPException(404, "Notebook not found")
     if nb.owner_id != current_user.id:
         raise HTTPException(403, "Not authorized")
 
-    _ensure_venv(notebook_id)
+    # Create venv if it doesn't exist (only when user explicitly installs packages)
+    python_path = _create_venv_if_needed(notebook_id)
     ws = _get_workspace(notebook_id)
     venv_dir = ws / "venv"
     pip_path = str(venv_dir / ("Scripts" if os.name == "nt" else "bin") / "pip")
@@ -260,24 +288,28 @@ async def install_packages(notebook_id: uuid.UUID, body: InstallRequest, current
 
 @router.get("/{notebook_id}/packages")
 async def list_installed_packages(notebook_id: uuid.UUID, current_user: User = Depends(get_current_user)):
-    """List installed packages in the notebook's venv."""
+    """List installed packages — global packages are always available."""
     nb = await Notebook.get(notebook_id)
     if not nb:
         raise HTTPException(404, "Notebook not found")
     if nb.owner_id != current_user.id and not nb.is_public:
         raise HTTPException(403, "Not authorized")
 
-    python_path = _get_venv_python(notebook_id)
-    venv_dir = _get_workspace(notebook_id) / "venv"
+    ws = _get_workspace(notebook_id)
+    venv_dir = ws / "venv"
+    
     if not venv_dir.exists():
-        return {"packages": PREINSTALLED_PACKAGES, "note": "Venv not yet created — these will be pre-installed on first run"}
+        return {
+            "packages": GLOBAL_PACKAGES,
+            "note": "Using system Python — global packages are available. Extra packages will create a per-notebook environment.",
+        }
 
     pip_path = str(venv_dir / ("Scripts" if os.name == "nt" else "bin") / "pip")
     try:
         result = subprocess.run([pip_path, "list", "--format=columns"], capture_output=True, text=True, timeout=15)
         return {"output": result.stdout}
     except Exception:
-        return {"packages": [], "error": "Could not list packages"}
+        return {"packages": GLOBAL_PACKAGES, "error": "Could not list packages"}
 
 
 # ── File Management ──────────────────────────────────────────────────────────

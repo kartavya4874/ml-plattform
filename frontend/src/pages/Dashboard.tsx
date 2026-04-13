@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -13,12 +13,15 @@ import {
     AccessTime,
     CheckCircle,
     Add as AddIcon,
+    Notifications as NotifIcon,
 } from '@mui/icons-material'
 import { fetchDatasets } from '../store/dataSlice'
 import { fetchJobs } from '../store/trainingSlice'
 import { fetchModels } from '../store/modelsSlice'
 import { fetchSubscription } from '../store/subscriptionSlice'
 import UpgradePrompt from '../components/UpgradePrompt'
+import OnboardingModal from '../components/OnboardingModal'
+import { api } from '../api/client'
 import type { AppDispatch, RootState } from '../store/store'
 
 const StatCard = ({ label, value, icon, color, sublabel }: { label: string; value: any; icon: React.ReactNode; color: string; sublabel?: string }) => (
@@ -138,6 +141,9 @@ export default function Dashboard() {
 
     return (
         <Box className="fade-in">
+            {/* Onboarding modal for first-time users */}
+            <OnboardingModal />
+
             {/* Header */}
             <Box mb={4}>
                 <Typography variant="h4" fontWeight={800} mb={0.5}>
@@ -147,6 +153,51 @@ export default function Dashboard() {
                     Here's what's happening with your AI projects today.
                 </Typography>
             </Box>
+
+            {/* Getting Started Checklist — shows until all steps completed */}
+            {(datasets.length === 0 || completedJobs === 0 || productionModels === 0) && (
+                <Card sx={{ mb: 4, border: '1px solid rgba(99,102,241,0.2)', background: 'linear-gradient(135deg, rgba(99,102,241,0.05) 0%, rgba(139,92,246,0.03) 100%)' }}>
+                    <CardContent sx={{ p: 3 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Box>
+                                <Typography variant="h6" fontWeight={700}>🚀 Getting Started</Typography>
+                                <Typography variant="body2" color="text.secondary">Complete these steps to build your first AI model</Typography>
+                            </Box>
+                            <Chip label={`${[datasets.length > 0, completedJobs > 0, productionModels > 0].filter(Boolean).length}/3`} 
+                                sx={{ fontWeight: 700, background: 'rgba(99,102,241,0.15)', color: '#6366F1' }} />
+                        </Box>
+                        <Grid container spacing={2}>
+                            {[
+                                { done: datasets.length > 0, label: 'Upload a Dataset', desc: 'Upload CSV, Excel, or image data', path: '/data', icon: <DataIcon /> },
+                                { done: completedJobs > 0, label: 'Train a Model', desc: 'Run AutoML or pick your own algorithm', path: '/train', icon: <TrainIcon /> },
+                                { done: productionModels > 0, label: 'Deploy to Production', desc: 'Create a REST API from your best model', path: '/models', icon: <DeployIcon /> },
+                            ].map((s, i) => (
+                                <Grid size={{ xs: 12, sm: 4 }} key={i}>
+                                    <Box 
+                                        onClick={() => !s.done && navigate(s.path)}
+                                        sx={{
+                                            p: 2, borderRadius: 2, cursor: s.done ? 'default' : 'pointer',
+                                            border: s.done ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                                            background: s.done ? 'rgba(16,185,129,0.06)' : 'rgba(255,255,255,0.02)',
+                                            opacity: s.done ? 0.7 : 1,
+                                            transition: 'all 0.2s',
+                                            '&:hover': !s.done ? { borderColor: '#6366F1', background: 'rgba(99,102,241,0.06)' } : {},
+                                        }}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                            {s.done ? <CheckCircle sx={{ color: '#10B981', fontSize: 20 }} /> : <Box sx={{ color: '#6366F1' }}>{s.icon}</Box>}
+                                            <Typography variant="body2" fontWeight={700} sx={{ textDecoration: s.done ? 'line-through' : 'none', color: s.done ? '#6B7280' : 'inherit' }}>
+                                                {s.label}
+                                            </Typography>
+                                        </Box>
+                                        <Typography variant="caption" color="text.secondary">{s.desc}</Typography>
+                                    </Box>
+                                </Grid>
+                            ))}
+                        </Grid>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Stats Row */}
             <Grid container spacing={3} mb={4}>
@@ -307,6 +358,54 @@ export default function Dashboard() {
                     </Box>
                 </>
             )}
+
+            {/* Activity Feed */}
+            <Box mt={4}>
+                <Typography variant="h6" fontWeight={700} mb={2}>📋 Recent Activity</Typography>
+                <ActivityFeed />
+            </Box>
+        </Box>
+    )
+}
+
+function ActivityFeed() {
+    const [activities, setActivities] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+    useEffect(() => {
+        api.get('/notifications/', { params: { limit: 10 } })
+            .then(({ data }) => setActivities(data))
+            .catch(() => {})
+            .finally(() => setLoading(false))
+    }, [])
+    
+    if (loading) return <CircularProgress size={20} />
+    if (activities.length === 0) return (
+        <Card><CardContent sx={{ textAlign: 'center', py: 4 }}>
+            <Typography variant="body2" color="text.secondary">No recent activity</Typography>
+        </CardContent></Card>
+    )
+
+    const typeColors: Record<string, string> = {
+        training_complete: '#10B981', training_failed: '#EF4444',
+        new_follower: '#8B5CF6', starred: '#F59E0B', forked: '#6366F1', system: '#6B7280'
+    }
+
+    return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {activities.map((a: any, i: number) => (
+                <Card key={a.id || i} sx={{ opacity: a.is_read ? 0.7 : 1 }}>
+                    <CardContent sx={{ py: 1.5, px: 2.5, '&:last-child': { pb: 1.5 }, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: typeColors[a.type] || '#6B7280', flexShrink: 0 }} />
+                        <Box sx={{ flex: 1 }}>
+                            <Typography variant="body2" fontWeight={600} sx={{ fontSize: 13 }}>{a.title}</Typography>
+                            <Typography variant="caption" color="text.secondary">{a.message}</Typography>
+                        </Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                            {new Date(a.created_at).toLocaleString()}
+                        </Typography>
+                    </CardContent>
+                </Card>
+            ))}
         </Box>
     )
 }

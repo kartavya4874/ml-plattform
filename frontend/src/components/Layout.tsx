@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
     Box, Drawer, AppBar, Toolbar, Typography, IconButton,
-    Avatar, Tooltip, Badge, Chip
+    Avatar, Tooltip, Badge, Chip, Popover, List, ListItemButton,
+    ListItemText, ListItemIcon, Button, Divider
 } from '@mui/material'
 import {
     Dashboard as DashboardIcon,
@@ -21,9 +22,14 @@ import {
     Code as NotebookIcon,
     EmojiEvents as CompIcon,
     AdminPanelSettings as AdminIcon,
+    VpnKey as VpnKeyIcon,
+    DarkMode as DarkModeIcon,
+    LightMode as LightModeIcon,
 } from '@mui/icons-material'
 import { logout } from '../store/authSlice'
 import { fetchSubscription } from '../store/subscriptionSlice'
+import { toggleTheme } from '../store/themeSlice'
+import { api } from '../api/client'
 import type { RootState, AppDispatch } from '../store/store'
 
 const DRAWER_WIDTH = 240
@@ -35,6 +41,7 @@ const navItems = [
     { label: 'Model Hub', icon: <ModelsIcon />, path: '/models' },
     { label: 'Pricing', icon: <PricingIcon />, path: '/pricing' },
     { label: 'Billing', icon: <ReceiptIcon />, path: '/billing' },
+    { label: 'API Keys', icon: <VpnKeyIcon />, path: '/api-keys' },
     { label: 'Profile', icon: <PersonIcon />, path: '/profile' },
 ]
 
@@ -61,12 +68,46 @@ export default function Layout() {
     const dispatch = useDispatch<AppDispatch>()
     const user = useSelector((s: RootState) => s.auth.user)
     const { summary } = useSelector((s: RootState) => s.subscription)
+    const themeMode = useSelector((s: RootState) => s.theme.mode)
     const currentTier = summary?.tier || user?.role || 'free'
     const tierColor = tierColors[currentTier] || '#6366F1'
 
+    // Notification state
+    const [unreadCount, setUnreadCount] = useState(0)
+    const [notifications, setNotifications] = useState<any[]>([])
+    const [notifAnchor, setNotifAnchor] = useState<HTMLElement | null>(null)
+
+    const fetchNotifs = useCallback(async () => {
+        try {
+            const [countRes, listRes] = await Promise.all([
+                api.get('/notifications/count'),
+                api.get('/notifications/', { params: { limit: 20 } }),
+            ])
+            setUnreadCount(countRes.data.unread)
+            setNotifications(listRes.data)
+        } catch {}
+    }, [])
+
     useEffect(() => {
         dispatch(fetchSubscription())
-    }, [dispatch])
+        fetchNotifs()
+        const interval = setInterval(fetchNotifs, 30000) // poll every 30s
+        return () => clearInterval(interval)
+    }, [dispatch, fetchNotifs])
+
+    const handleNotifClick = async (notif: any) => {
+        if (!notif.is_read) {
+            await api.post(`/notifications/${notif.id}/read`)
+            fetchNotifs()
+        }
+        setNotifAnchor(null)
+        if (notif.link) navigate(notif.link)
+    }
+
+    const handleMarkAllRead = async () => {
+        await api.post('/notifications/read-all')
+        fetchNotifs()
+    }
 
     return (
         <Box sx={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
@@ -199,13 +240,69 @@ export default function Layout() {
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <AppBar position="static" elevation={0}>
                     <Toolbar sx={{ justifyContent: 'flex-end', gap: 1 }}>
+                        <Tooltip title={themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+                            <IconButton
+                                id="theme-toggle"
+                                sx={{ color: 'text.secondary' }}
+                                onClick={() => dispatch(toggleTheme())}
+                            >
+                                {themeMode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+                            </IconButton>
+                        </Tooltip>
                         <Tooltip title="Notifications">
-                            <IconButton sx={{ color: 'text.secondary' }}>
-                                <Badge badgeContent={0} color="error">
+                            <IconButton sx={{ color: 'text.secondary' }} onClick={(e) => setNotifAnchor(e.currentTarget)}>
+                                <Badge badgeContent={unreadCount} color="error">
                                     <NotifIcon />
                                 </Badge>
                             </IconButton>
                         </Tooltip>
+                        <Popover
+                            open={!!notifAnchor}
+                            anchorEl={notifAnchor}
+                            onClose={() => setNotifAnchor(null)}
+                            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                            PaperProps={{ sx: { width: 360, maxHeight: 420, background: '#1A1A24', border: '1px solid rgba(255,255,255,0.08)' } }}
+                        >
+                            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="subtitle2" fontWeight={700}>Notifications</Typography>
+                                {unreadCount > 0 && (
+                                    <Button size="small" onClick={handleMarkAllRead} sx={{ fontSize: 11 }}>Mark all read</Button>
+                                )}
+                            </Box>
+                            <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)' }} />
+                            {notifications.length === 0 ? (
+                                <Box sx={{ p: 3, textAlign: 'center' }}>
+                                    <Typography variant="body2" color="text.secondary">No notifications yet</Typography>
+                                </Box>
+                            ) : (
+                                <List dense sx={{ p: 0, maxHeight: 320, overflowY: 'auto' }}>
+                                    {notifications.map((n: any) => (
+                                        <ListItemButton
+                                            key={n.id}
+                                            onClick={() => handleNotifClick(n)}
+                                            sx={{
+                                                px: 2, py: 1.5,
+                                                background: n.is_read ? 'transparent' : 'rgba(99,102,241,0.05)',
+                                                borderLeft: n.is_read ? 'none' : '3px solid #6366F1',
+                                            }}
+                                        >
+                                            <ListItemText
+                                                primary={<Typography variant="body2" fontWeight={n.is_read ? 400 : 700} sx={{ fontSize: 13 }}>{n.title}</Typography>}
+                                                secondary={
+                                                    <Box>
+                                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{n.message}</Typography>
+                                                        <Typography variant="caption" sx={{ color: '#6B7280', fontSize: 10 }}>
+                                                            {new Date(n.created_at).toLocaleString()}
+                                                        </Typography>
+                                                    </Box>
+                                                }
+                                            />
+                                        </ListItemButton>
+                                    ))}
+                                </List>
+                            )}
+                        </Popover>
                     </Toolbar>
                 </AppBar>
 

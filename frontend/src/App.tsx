@@ -24,6 +24,10 @@ import CompetitionsPage from './pages/CompetitionsPage'
 import LeaderboardPage from './pages/LeaderboardPage'
 import UserProfilePage from './pages/UserProfilePage'
 import AdminPage from './pages/AdminPage'
+import ModelComparison from './pages/ModelComparison'
+import ApiKeysPage from './pages/ApiKeysPage'
+import NotFoundPage from './pages/NotFoundPage'
+import LandingPage from './pages/LandingPage'
 
 /** Guard: redirects to /login if no access token */
 function RequireAuth() {
@@ -31,22 +35,29 @@ function RequireAuth() {
   return token ? <Outlet /> : <Navigate to="/login" replace />
 }
 
+/** Root route: landing page if unauthenticated, dashboard if authenticated */
+function RootRoute() {
+  const token = useSelector((s: RootState) => s.auth.accessToken)
+  return token ? <Navigate to="/dashboard" replace /> : <LandingPage />
+}
+
 export default function App() {
   return (
     <Routes>
       {/* Public routes */}
+      <Route path="/" element={<RootRoute />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
       {/* Protected routes — auth guard first, then layout shell */}
       <Route element={<RequireAuth />}>
         <Route element={<Layout />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/data" element={<DataExplorer />} />
           <Route path="/data/:id" element={<DataPrepStudio />} />
           <Route path="/train" element={<TrainingStudio />} />
           <Route path="/models" element={<ModelHub />} />
+          <Route path="/models/compare" element={<ModelComparison />} />
           <Route path="/models/:id" element={<ModelDetail />} />
           <Route path="/test/:id" element={<TestingPlayground />} />
           <Route path="/deploy/:id" element={<DeploymentHub />} />
@@ -65,10 +76,11 @@ export default function App() {
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/billing" element={<ManageBillingPage />} />
           <Route path="/profile" element={<ManageProfilePage />} />
+          <Route path="/api-keys" element={<ApiKeysPage />} />
           <Route path="/admin" element={<AdminPage />} />
 
           <Route path="/model-hub" element={<Navigate to="/models" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>
     </Routes>

@@ -149,6 +149,13 @@ async def _run_training_background(
             target_column = df.columns[-1]
             X = df.iloc[:, :-1]
 
+        # Exclude user-specified columns
+        excluded = config.get("excluded_columns", [])
+        actually_excluded = [c for c in excluded if c in X.columns]
+        if actually_excluded:
+            X = X.drop(columns=actually_excluded)
+            await publish({"message": f"🚫 Excluded {len(actually_excluded)} columns: {', '.join(actually_excluded)}", "pct": 23})
+
         await publish({"message": f"🎯 Target: {target_column} ({y.nunique()} unique values)", "pct": 25})
 
         # Clean data
@@ -185,12 +192,21 @@ async def _run_training_background(
         X = X[mask].reset_index(drop=True)
         y = y[mask].reset_index(drop=True)
 
-        await publish({"message": f"✅ Final training set: {len(X)} samples", "pct": 40})
+        await publish({"message": f"✅ Final training set: {len(X)} samples, {X.shape[1]} features", "pct": 40})
+
+        # Read hyperparameters from config
+        algorithm = config.get("algorithm", "auto")
+        n_estimators = config.get("n_estimators", 100)
+        max_depth_val = config.get("max_depth", None)
+        lr = config.get("learning_rate", 0.1)
+        test_sz = config.get("test_size", 0.2)
+        random_st = config.get("random_state", 42)
+        cv_folds = config.get("cross_validation", None)
 
         # Train-test split
-        from sklearn.model_selection import train_test_split
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        await publish({"message": f"📐 Train/test split: {len(X_train)}/{len(X_test)}", "pct": 45})
+        from sklearn.model_selection import train_test_split, cross_val_score
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_sz, random_state=random_st)
+        await publish({"message": f"📐 Train/test split: {len(X_train)}/{len(X_test)} (test_size={test_sz})", "pct": 45})
 
         metrics = {}
         time_limit = config.get("time_limit_seconds", 120)
@@ -200,13 +216,24 @@ async def _run_training_background(
 
             from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
             from sklearn.linear_model import LogisticRegression
+            from sklearn.svm import SVC
+            from sklearn.neighbors import KNeighborsClassifier
             from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 
-            models = [
-                ("LogisticRegression", LogisticRegression(max_iter=500, random_state=42)),
-                ("RandomForest", RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)),
-                ("GradientBoosting", GradientBoostingClassifier(n_estimators=100, random_state=42)),
-            ]
+            all_models = {
+                "logistic_regression": ("LogisticRegression", LogisticRegression(max_iter=500, random_state=random_st)),
+                "random_forest": ("RandomForest", RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth_val, random_state=random_st, n_jobs=-1)),
+                "gradient_boosting": ("GradientBoosting", GradientBoostingClassifier(n_estimators=n_estimators, max_depth=max_depth_val or 3, learning_rate=lr, random_state=random_st)),
+                "svm": ("SVM", SVC(probability=True, random_state=random_st)),
+                "knn": ("KNN", KNeighborsClassifier()),
+            }
+
+            if algorithm == "auto":
+                models = [all_models["logistic_regression"], all_models["random_forest"], all_models["gradient_boosting"]]
+            elif algorithm in all_models:
+                models = [all_models[algorithm]]
+            else:
+                models = [all_models["random_forest"]]
 
             best_score = -1
             best_model = None
@@ -221,7 +248,13 @@ async def _run_training_background(
                     preds = await loop.run_in_executor(None, model.predict, X_test)
                     acc = accuracy_score(y_test, preds)
                     f1 = f1_score(y_test, preds, average="weighted", zero_division=0)
-                    await publish({"message": f"  ✅ {name}: accuracy={acc:.4f}, f1={f1:.4f}", "pct": pct + 5})
+
+                    cv_msg = ""
+                    if cv_folds:
+                        cv_scores = await loop.run_in_executor(None, lambda: cross_val_score(model, X, y, cv=cv_folds, scoring="accuracy"))
+                        cv_msg = f", CV({cv_folds})={cv_scores.mean():.4f}±{cv_scores.std():.4f}"
+                    
+                    await publish({"message": f"  ✅ {name}: accuracy={acc:.4f}, f1={f1:.4f}{cv_msg}", "pct": pct + 5})
 
                     if f1 > best_score:
                         best_score = f1
@@ -237,10 +270,23 @@ async def _run_training_background(
                     "f1_weighted": round(float(f1_score(y_test, preds, average="weighted", zero_division=0)), 4),
                     "best_model": best_name,
                 }
+                # Feature importance for tree-based models
+                if hasattr(best_model, "feature_importances_"):
+                    fi = best_model.feature_importances_
+                    feature_names = X.columns.tolist()
+                    top_features = sorted(zip(feature_names, fi.tolist()), key=lambda x: x[1], reverse=True)[:15]
+                    metrics["feature_importance"] = [{"feature": f, "importance": round(imp, 4)} for f, imp in top_features]
                 try:
                     if len(set(y_test)) == 2:
                         proba = best_model.predict_proba(X_test)[:, 1]
                         metrics["roc_auc"] = round(float(roc_auc_score(y_test, proba)), 4)
+                except Exception:
+                    pass
+                # Confusion matrix
+                try:
+                    from sklearn.metrics import confusion_matrix
+                    cm = confusion_matrix(y_test, preds).tolist()
+                    metrics["confusion_matrix"] = cm
                 except Exception:
                     pass
 
@@ -249,13 +295,24 @@ async def _run_training_background(
 
             from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
             from sklearn.linear_model import LinearRegression
+            from sklearn.svm import SVR
+            from sklearn.neighbors import KNeighborsRegressor
             from sklearn.metrics import mean_squared_error, r2_score
 
-            models = [
-                ("LinearRegression", LinearRegression()),
-                ("RandomForest", RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)),
-                ("GradientBoosting", GradientBoostingRegressor(n_estimators=100, random_state=42)),
-            ]
+            all_models = {
+                "linear_regression": ("LinearRegression", LinearRegression()),
+                "random_forest": ("RandomForest", RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth_val, random_state=random_st, n_jobs=-1)),
+                "gradient_boosting": ("GradientBoosting", GradientBoostingRegressor(n_estimators=n_estimators, max_depth=max_depth_val or 3, learning_rate=lr, random_state=random_st)),
+                "svm": ("SVR", SVR()),
+                "knn": ("KNN", KNeighborsRegressor()),
+            }
+
+            if algorithm == "auto":
+                models = [all_models["linear_regression"], all_models["random_forest"], all_models["gradient_boosting"]]
+            elif algorithm in all_models:
+                models = [all_models[algorithm]]
+            else:
+                models = [all_models["random_forest"]]
 
             best_score = -999
             best_model = None
@@ -270,7 +327,13 @@ async def _run_training_background(
                     preds = await loop.run_in_executor(None, model.predict, X_test)
                     rmse = float(np.sqrt(mean_squared_error(y_test, preds)))
                     r2 = float(r2_score(y_test, preds))
-                    await publish({"message": f"  ✅ {name}: RMSE={rmse:.4f}, R²={r2:.4f}", "pct": pct + 5})
+
+                    cv_msg = ""
+                    if cv_folds:
+                        cv_scores = await loop.run_in_executor(None, lambda: cross_val_score(model, X, y, cv=cv_folds, scoring="r2"))
+                        cv_msg = f", CV({cv_folds})={cv_scores.mean():.4f}±{cv_scores.std():.4f}"
+
+                    await publish({"message": f"  ✅ {name}: RMSE={rmse:.4f}, R²={r2:.4f}{cv_msg}", "pct": pct + 5})
 
                     if r2 > best_score:
                         best_score = r2
@@ -286,6 +349,11 @@ async def _run_training_background(
                     "r2": round(float(r2_score(y_test, preds)), 4),
                     "best_model": best_name,
                 }
+                if hasattr(best_model, "feature_importances_"):
+                    fi = best_model.feature_importances_
+                    feature_names = X.columns.tolist()
+                    top_features = sorted(zip(feature_names, fi.tolist()), key=lambda x: x[1], reverse=True)[:15]
+                    metrics["feature_importance"] = [{"feature": f, "importance": round(imp, 4)} for f, imp in top_features]
 
         await publish({"message": f"🏆 Best model: {metrics.get('best_model', 'N/A')}", "pct": 90})
 
@@ -328,6 +396,19 @@ async def _run_training_background(
 
         await publish({"message": "🎉 Training complete!", "pct": 100, "event": "completed"})
 
+        # Send notification
+        try:
+            from app.api.v1.notifications import create_notification
+            await create_notification(
+                user_id=uuid.UUID(user_id),
+                type="training_complete",
+                title="Training Complete! 🎉",
+                message=f"Your {task_type} model finished training. Best: {metrics.get('best_model', 'N/A')}",
+                link=f"/models",
+            )
+        except Exception:
+            pass
+
     except Exception as e:
         log.error("training.failed", job_id=job_id, error=str(e))
         await publish({"message": f"❌ Training failed: {str(e)}", "pct": 0, "event": "failed"})
@@ -337,6 +418,19 @@ async def _run_training_background(
                 job.status = JobStatus.failed
                 job.error_message = str(e)[:500]
                 await job.save()
+        except Exception:
+            pass
+
+        # Send failure notification
+        try:
+            from app.api.v1.notifications import create_notification
+            await create_notification(
+                user_id=uuid.UUID(user_id),
+                type="training_failed",
+                title="Training Failed ❌",
+                message=f"Your {task_type} training job encountered an error.",
+                link=f"/train",
+            )
         except Exception:
             pass
     finally:

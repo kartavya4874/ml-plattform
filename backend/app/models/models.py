@@ -294,6 +294,8 @@ class Comment(Document):
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
     discussion_id: uuid.UUID
     author_id: uuid.UUID
+    author_name: str = ""
+    parent_id: uuid.UUID | None = None  # for threaded replies
     content: str
     upvotes: int = 0
     created_at: datetime = Field(default_factory=utcnow)
@@ -450,3 +452,18 @@ class OrgMembership(Document):
     class Settings:
         name = "org_memberships"
         indexes = [[("org_id", 1), ("user_id", 1)]]
+
+
+class Notification(Document):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    user_id: uuid.UUID           # recipient
+    type: str                    # training_complete, training_failed, new_follower, starred, forked, system
+    title: str
+    message: str = ""
+    link: str | None = None      # optional navigation link
+    is_read: bool = False
+    created_at: datetime = Field(default_factory=utcnow)
+
+    class Settings:
+        name = "notifications"
+        indexes = [[("user_id", 1), ("created_at", -1)]]

@@ -49,6 +49,10 @@ export default function ModelHub() {
                         All your trained models in one place
                     </Typography>
                 </Box>
+                <Button variant="outlined" onClick={() => navigate('/models/compare')}
+                    sx={{ textTransform: 'none', fontWeight: 600 }}>
+                    ⚖️ Compare Models
+                </Button>
             </Box>
 
             {/* Filters */}

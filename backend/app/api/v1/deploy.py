@@ -160,6 +160,68 @@ async def export_model(
 
 # ── API Key Management ────────────────────────────────────────────────────────
 
+@router.get("/keys/all")
+async def list_all_api_keys(
+    current_user: User = Depends(get_current_user),
+):
+    """List all API keys owned by the current user (across all models)."""
+    keys = await APIKey.find(APIKey.owner_id == current_user.id).to_list()
+
+    # Batch lookup model names
+    model_ids = list(set(k.model_id for k in keys))
+    models = await MLModel.find({"_id": {"$in": model_ids}}).to_list()
+    model_names = {m.id: m.name for m in models}
+
+    result = []
+    for k in keys:
+        result.append({
+            "id": str(k.id),
+            "name": k.name,
+            "model_id": str(k.model_id),
+            "model_name": model_names.get(k.model_id, "Unknown"),
+            "is_active": k.is_active,
+            "key_prefix": k.key_hash[:12] if k.key_hash else "",
+            "last_used_at": k.last_used_at.isoformat() if k.last_used_at else None,
+            "created_at": k.created_at.isoformat(),
+        })
+
+    return result
+
+
+@router.post("/keys/{key_id}/regenerate", response_model=APIKeyOut)
+async def regenerate_api_key(
+    key_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+):
+    """Revoke an existing key and create a replacement with the same name."""
+    old_key = await APIKey.find_one(
+        APIKey.id == key_id,
+        APIKey.owner_id == current_user.id,
+    )
+    if not old_key:
+        raise HTTPException(status_code=404, detail="API key not found")
+    if not old_key.is_active:
+        raise HTTPException(status_code=400, detail="Key is already revoked")
+
+    # Deactivate old key
+    old_key.is_active = False
+    await old_key.save()
+
+    # Create replacement
+    raw_key = f"sk-{secrets.token_urlsafe(32)}"
+    new_key = APIKey(
+        model_id=old_key.model_id,
+        owner_id=current_user.id,
+        name=old_key.name,
+        key_hash=hash_api_key(raw_key),
+    )
+    await new_key.insert()
+
+    key_out = APIKeyOut.model_validate(new_key)
+    key_out.raw_key = raw_key
+    return key_out
+
+
 @router.post("/{model_id}/keys", response_model=APIKeyOut, status_code=201)
 async def create_api_key(
     model_id: uuid.UUID,

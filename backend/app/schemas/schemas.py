@@ -125,6 +125,15 @@ class TrainingConfig(BaseModel):
     backbone: str | None = None      # for image models
     model_name: str | None = None    # for NLP models
     epochs: int | None = None
+    # ── Advanced hyperparameters (all optional, defaults = current behavior) ──
+    algorithm: str = "auto"          # auto | logistic_regression | random_forest | gradient_boosting | svm | knn | linear_regression
+    n_estimators: int = 100          # number of trees (for RF/GB)
+    max_depth: int | None = None     # tree depth limit (None = unlimited)
+    learning_rate: float = 0.1       # step size for boosting
+    test_size: float = 0.2           # train/test split ratio
+    random_state: int = 42           # reproducibility seed
+    cross_validation: int | None = None  # None = no CV, 3/5/10 = K-fold
+    excluded_columns: list[str] = [] # columns to exclude from features
 
 
 class TrainingJobCreate(BaseModel):

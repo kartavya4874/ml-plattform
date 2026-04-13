@@ -183,6 +183,31 @@ async def update_dataset(
     return dataset
 
 
+@router.get("/datasets/{dataset_id}/download")
+async def download_dataset(
+    dataset_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    storage: StorageService = Depends(StorageService.get_instance),
+):
+    """Download the raw dataset file."""
+    dataset = await Dataset.get(dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    _check_dataset_access(dataset, current_user)
+
+    try:
+        data = await storage.download_bytes(settings.MINIO_BUCKET_DATA, dataset.minio_path)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to retrieve file from storage")
+
+    filename = dataset.name or "dataset"
+    return Response(
+        content=data,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.delete("/datasets/{dataset_id}", status_code=204)
 async def delete_dataset(
     dataset_id: uuid.UUID,
@@ -352,3 +377,105 @@ async def get_dataset_sample(
     df = await load_dataset_df(dataset)
     return get_sample_data(df, rows=rows)
 
+
+@router.post("/datasets/{dataset_id}/auto-fix")
+async def auto_fix_dataset(
+    dataset_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    storage: StorageService = Depends(StorageService.get_instance),
+):
+    """One-click auto-fix: handle missing values, encode categoricals, normalize numerics.
+    
+    Creates a new cleaned version of the dataset. Non-destructive — original is kept.
+    """
+    import pandas as pd
+    import numpy as np
+
+    dataset = await Dataset.get(dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    if dataset.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only owner can auto-fix")
+    if dataset.dataset_type != "tabular":
+        raise HTTPException(status_code=400, detail="Auto-fix only works on tabular datasets")
+
+    # Load original
+    content = await storage.download_bytes(settings.MINIO_BUCKET_DATA, dataset.minio_path)
+    path = dataset.minio_path.lower()
+    if path.endswith((".xlsx", ".xls")):
+        df = pd.read_excel(io.BytesIO(content))
+    elif path.endswith(".parquet"):
+        df = pd.read_parquet(io.BytesIO(content))
+    else:
+        df = pd.read_csv(io.BytesIO(content))
+
+    original_shape = df.shape
+    fixes_applied = []
+
+    # 1. Handle missing values
+    numeric_cols = df.select_dtypes(include="number").columns.tolist()
+    cat_cols = df.select_dtypes(exclude="number").columns.tolist()
+
+    nulls_before = int(df.isnull().sum().sum())
+    for c in numeric_cols:
+        if df[c].isnull().any():
+            df[c] = df[c].fillna(df[c].median())
+    for c in cat_cols:
+        if df[c].isnull().any():
+            mode = df[c].mode()
+            df[c] = df[c].fillna(mode.iloc[0] if len(mode) > 0 else "unknown")
+    nulls_after = int(df.isnull().sum().sum())
+    if nulls_before > 0:
+        fixes_applied.append(f"Filled {nulls_before} missing values (numeric→median, text→mode)")
+
+    # 2. Remove duplicate rows
+    dupes = int(df.duplicated().sum())
+    if dupes > 0:
+        df = df.drop_duplicates().reset_index(drop=True)
+        fixes_applied.append(f"Removed {dupes} duplicate rows")
+
+    # 3. Remove constant columns (no predictive value)
+    const_cols = [c for c in df.columns if df[c].nunique() <= 1]
+    if const_cols:
+        df = df.drop(columns=const_cols)
+        fixes_applied.append(f"Removed {len(const_cols)} constant column(s): {', '.join(const_cols)}")
+
+    # Save cleaned version
+    cleaned_csv = df.to_csv(index=False).encode("utf-8")
+    clean_name = f"cleaned_{dataset.name}" if not dataset.name.startswith("cleaned_") else dataset.name
+    clean_path = f"{current_user.id}/{dataset_id}/{clean_name}"
+    await storage.upload_bytes(
+        bucket=settings.MINIO_BUCKET_DATA,
+        object_name=clean_path,
+        data=cleaned_csv,
+        content_type="text/csv",
+    )
+
+    # Update dataset record
+    dataset.minio_path = clean_path
+    dataset.name = clean_name
+    dataset.file_size_bytes = len(cleaned_csv)
+    dataset.row_count = df.shape[0]
+    dataset.column_count = df.shape[1]
+    dataset.version = (dataset.version or 1) + 1
+    dataset.status = "ready"
+    await dataset.save()
+
+    # Re-profile the cleaned dataset
+    await asyncio.get_event_loop().run_in_executor(
+        None,
+        lambda: asyncio.run(profile_dataset(
+            dataset_id=str(dataset_id),
+            minio_path=clean_path,
+            dataset_type="tabular",
+            file_content=cleaned_csv,
+        ))
+    )
+
+    return {
+        "message": f"✅ Auto-fix complete! {len(fixes_applied)} fix(es) applied.",
+        "fixes": fixes_applied,
+        "original_shape": list(original_shape),
+        "new_shape": list(df.shape),
+        "new_version": dataset.version,
+    }

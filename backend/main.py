@@ -27,6 +27,7 @@ from app.api.v1.notebooks import router as notebooks_router
 from app.api.v1.competitions import router as competitions_router
 from app.api.v1.organizations import router as organizations_router
 from app.api.v1.admin import router as admin_router
+from app.api.v1.notifications import router as notifications_router
 
 log = structlog.get_logger()
 limiter = Limiter(key_func=get_remote_address)
@@ -96,6 +97,7 @@ app.include_router(notebooks_router, prefix=prefix)
 app.include_router(competitions_router, prefix=prefix)
 app.include_router(organizations_router, prefix=prefix)
 app.include_router(admin_router, prefix=prefix)
+app.include_router(notifications_router, prefix=prefix)
 
 # ── Global Exception Handler ───────────────────────────────────────────────────
 

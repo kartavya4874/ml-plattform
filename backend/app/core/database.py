@@ -17,6 +17,7 @@ async def init_db():
         Notebook,
         Competition, Submission,
         Organization, OrgMembership,
+        Notification,
     )
     import structlog
     import asyncio
@@ -54,6 +55,7 @@ async def init_db():
             Notebook,
             Competition, Submission,
             Organization, OrgMembership,
+            Notification,
         ],
         allow_index_dropping=False
     )
