@@ -29,7 +29,7 @@ export default function CompetitionsPage() {
 
             <Grid container spacing={3}>
                 {competitions.length === 0 ? (
-                    <Grid item xs={12}>
+                    <Grid size={{ xs: 12 }}>
                         <Card sx={{ p: 6, textAlign: 'center' }}>
                             <TrophyIcon sx={{ fontSize: 48, color: '#F59E0B', mb: 2 }} />
                             <Typography variant="h6" mb={1}>No active competitions</Typography>
@@ -37,7 +37,7 @@ export default function CompetitionsPage() {
                         </Card>
                     </Grid>
                 ) : competitions.map(comp => (
-                    <Grid item xs={12} md={6} key={comp.id}>
+                    <Grid size={{ xs: 12, md: 6 }} key={comp.id}>
                         <Card sx={{ p: 3, cursor: 'pointer', '&:hover': { borderColor: '#444' }, transition: 'border-color 0.2s' }}
                               onClick={() => navigate(`/competitions/${comp.id}`)}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>

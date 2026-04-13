@@ -80,7 +80,7 @@ export default function AdminPage() {
                         { label: 'Public Datasets', val: stats.public_datasets },
                         { label: 'Public Models', val: stats.public_models },
                     ].map(s => (
-                        <Grid item xs={6} md={3} lg={2} key={s.label}>
+                        <Grid size={{ xs: 6, md: 3, lg: 2 }} key={s.label}>
                             <Card sx={{ p: 2, textAlign: 'center' }}>
                                 <Typography variant="h5" fontWeight={800}>{s.val}</Typography>
                                 <Typography variant="caption" color="text.secondary">{s.label}</Typography>

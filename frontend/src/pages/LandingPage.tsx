@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Box, Typography, Button, Container, Grid, Chip, useTheme, Card, IconButton } from '@mui/material'
-import { motion, useScroll, useTransform } from 'framer-motion'
+import { motion, useScroll, useTransform, type Variants } from 'framer-motion'
 import {
     AutoAwesome as LogoIcon,
     CloudUpload as UploadIcon,
@@ -39,9 +39,9 @@ const containerVariants = {
     visible: { opacity: 1, transition: { staggerChildren: 0.15 } }
 }
 
-const itemVariants = {
+const itemVariants: Variants = {
     hidden: { opacity: 0, y: 30 },
-    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 80, damping: 20 } }
+    visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 80, damping: 20 } }
 }
 
 function AutoAwesomeIcon(props: React.ComponentProps<typeof LogoIcon>) {

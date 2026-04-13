@@ -17,7 +17,7 @@ export default function ManageProfilePage() {
     const [website, setWebsite] = useState(user?.website || '')
     const [githubUrl, setGithubUrl] = useState(user?.github_url || '')
     const [kaggleUrl, setKaggleUrl] = useState(user?.kaggle_url || '')
-    const [is2FA, setIs2FA] = useState(user?.is_2fa_enabled || false)
+    const [is2FA, setIs2FA] = useState((user as any)?.is_2fa_enabled || false)
     
     // Avatar upload
     const [avatarFile, setAvatarFile] = useState<File | null>(null)

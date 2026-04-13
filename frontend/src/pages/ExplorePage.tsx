@@ -86,7 +86,7 @@ export default function ExplorePage() {
                     {tab === 0 && <Typography variant="h6" fontWeight={700} mb={2}>Datasets</Typography>}
                     <Grid container spacing={2}>
                         {results.datasets.map((d: any) => (
-                            <Grid item xs={12} md={6} key={d.id}>
+                            <Grid size={{ xs: 12, md: 6 }} key={d.id}>
                                 <Card sx={{ p: 3, '&:hover': { borderColor: '#444' }, transition: 'border-color 0.2s' }}>
                                     <Typography variant="subtitle1" fontWeight={700}>{d.name}</Typography>
                                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1, minHeight: 36 }}>{d.description || 'No description'}</Typography>
@@ -108,7 +108,7 @@ export default function ExplorePage() {
                     {tab === 0 && <Typography variant="h6" fontWeight={700} mb={2}>Models</Typography>}
                     <Grid container spacing={2}>
                         {results.models.map((m: any) => (
-                            <Grid item xs={12} md={6} key={m.id}>
+                            <Grid size={{ xs: 12, md: 6 }} key={m.id}>
                                 <Card sx={{ p: 3, '&:hover': { borderColor: '#444' }, transition: 'border-color 0.2s' }}>
                                     <Typography variant="subtitle1" fontWeight={700}>{m.name}</Typography>
                                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1, minHeight: 36 }}>{m.description || 'No description'}</Typography>
@@ -130,7 +130,7 @@ export default function ExplorePage() {
                     {tab === 0 && <Typography variant="h6" fontWeight={700} mb={2}>Notebooks</Typography>}
                     <Grid container spacing={2}>
                         {results.notebooks.map((n: any) => (
-                            <Grid item xs={12} md={6} key={n.id}>
+                            <Grid size={{ xs: 12, md: 6 }} key={n.id}>
                                 <Card sx={{ p: 3, cursor: 'pointer', '&:hover': { borderColor: '#444' } }} onClick={() => navigate(`/notebooks/${n.id}`)}>
                                     <Typography variant="subtitle1" fontWeight={700}>{n.title}</Typography>
                                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{n.description || 'No description'}</Typography>
@@ -151,7 +151,7 @@ export default function ExplorePage() {
                     {tab === 0 && <Typography variant="h6" fontWeight={700} mb={2}>Users</Typography>}
                     <Grid container spacing={2}>
                         {results.users.map((u: any) => (
-                            <Grid item xs={12} md={4} key={u.id}>
+                            <Grid size={{ xs: 12, md: 4 }} key={u.id}>
                                 <Card sx={{ p: 3, cursor: 'pointer', '&:hover': { borderColor: '#444' } }} onClick={() => u.username && navigate(`/u/${u.username}`)}>
                                     <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                                         <Avatar src={u.avatar_url || undefined} sx={{ width: 40, height: 40 }}>{(u.username || 'U')[0].toUpperCase()}</Avatar>
