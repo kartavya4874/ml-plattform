@@ -230,8 +230,8 @@ def train_image_classifier(
     import asyncio as _asyncio
     storage = StorageService()
     loop = _asyncio.new_event_loop()
-    loop.run_until_complete(storage.upload_bytes(settings.MINIO_BUCKET_MODELS, artifact_path, model_bytes))
-    loop.run_until_complete(storage.upload_bytes(settings.MINIO_BUCKET_MODELS, onnx_path, onnx_bytes, "application/octet-stream"))
+    loop.run_until_complete(storage.upload_bytes(settings.R2_BUCKET_MODELS, artifact_path, model_bytes))
+    loop.run_until_complete(storage.upload_bytes(settings.R2_BUCKET_MODELS, onnx_path, onnx_bytes, "application/octet-stream"))
     loop.close()
 
     input_schema = {

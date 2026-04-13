@@ -153,7 +153,7 @@ def train_tabular(
     loop = _asyncio.new_event_loop()
     storage = StorageService()
     loop.run_until_complete(
-        storage.upload_bytes(settings.MINIO_BUCKET_MODELS, artifact_path, model_bytes, "application/octet-stream")
+        storage.upload_bytes(settings.R2_BUCKET_MODELS, artifact_path, model_bytes, "application/octet-stream")
     )
     loop.close()
 

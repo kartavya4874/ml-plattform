@@ -172,7 +172,7 @@ def train_text_classifier(
     storage = StorageService()
     loop = _asyncio.new_event_loop()
     loop.run_until_complete(
-        storage.upload_bytes(settings.MINIO_BUCKET_MODELS, artifact_path, tar_bytes, "application/gzip")
+        storage.upload_bytes(settings.R2_BUCKET_MODELS, artifact_path, tar_bytes, "application/gzip")
     )
     loop.close()
 
