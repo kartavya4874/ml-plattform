@@ -52,7 +52,7 @@ class InferenceService:
 
         storage = await self._get_storage()
         artifact_bytes = await storage.download_bytes(
-            settings.MINIO_BUCKET_MODELS, model_obj.artifact_path
+            settings.R2_BUCKET_MODELS, model_obj.artifact_path
         )
         loaded = pickle.loads(artifact_bytes)
         self._cache.put(cache_key, loaded)

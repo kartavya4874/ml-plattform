@@ -2,7 +2,7 @@ import { createSlice } from '@reduxjs/toolkit'
 
 type ThemeMode = 'dark' | 'light'
 
-const STORAGE_KEY = 'nexusml_theme'
+const STORAGE_KEY = 'parametrix_theme'
 
 interface ThemeState {
     mode: ThemeMode

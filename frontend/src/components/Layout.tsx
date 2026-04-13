@@ -131,7 +131,7 @@ export default function Layout() {
                         <LogoIcon sx={{ color: '#000', fontSize: 18 }} />
                     </Box>
                     <Box>
-                        <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2 }}>NexusML</Typography>
+                        <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2 }}>Parametrix AI</Typography>
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 10 }}>v1.0</Typography>
                     </Box>
                 </Box>

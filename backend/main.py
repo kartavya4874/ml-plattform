@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="NexusML — train, explain, and deploy ML models without writing a single line of code.",
+    description="Parametrix AI — train, explain, and deploy ML models without writing a single line of code.",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",

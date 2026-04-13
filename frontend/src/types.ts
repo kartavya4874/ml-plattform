@@ -1,4 +1,4 @@
-/** Shared TypeScript interfaces for the NexusML platform. */
+/** Shared TypeScript interfaces for the Parametrix AI platform. */
 
 export interface User {
     id: string

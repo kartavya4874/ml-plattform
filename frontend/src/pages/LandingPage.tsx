@@ -69,12 +69,12 @@ const AnimatedTerminal = () => {
             </Box>
             <Box sx={{ p: 3, fontFamily: '"JetBrains Mono", monospace', fontSize: 13, color: isDark ? '#E4E4E7' : '#3F3F46', lineHeight: 1.7 }}>
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
-                    <span style={{ color: '#C084FC' }}>import</span> nexusml <br />
-                    <span style={{ color: '#C084FC' }}>from</span> nexusml.automl <span style={{ color: '#C084FC' }}>import</span> AutoModel
+                    <span style={{ color: '#C084FC' }}>import</span> parametrix <br />
+                    <span style={{ color: '#C084FC' }}>from</span> parametrix.automl <span style={{ color: '#C084FC' }}>import</span> AutoModel
                 </motion.div>
                 <div style={{ marginTop: 16 }} />
                 <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.2 }}>
-                    dataset = nexusml.load(<span style={{ color: '#10B981' }}>'sales_data.csv'</span>)
+                    dataset = parametrix.load(<span style={{ color: '#10B981' }}>'sales_data.csv'</span>)
                 </motion.div>
                 <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.8 }}>
                     model = AutoModel(target=<span style={{ color: '#10B981' }}>'revenue'</span>)
@@ -165,7 +165,7 @@ export default function LandingPage() {
                         }}>
                             <LogoIcon sx={{ color: isDark ? '#000' : '#FFF', fontSize: 18 }} />
                         </Box>
-                        <Typography variant="h6" fontWeight={800} letterSpacing="-0.5px">NexusML</Typography>
+                        <Typography variant="h6" fontWeight={800} letterSpacing="-0.5px">Parametrix AI</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <IconButton 
@@ -211,7 +211,7 @@ export default function LandingPage() {
                                 <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>
                                     <Chip
                                         icon={<AutoAwesomeIcon sx={{ fontSize: '14px !important', color: '#6366F1' }} />}
-                                        label="NexusML Platform v1.0 Launch"
+                                        label="Parametrix AI Platform v1.0 Launch"
                                         sx={{
                                             mb: 4, background: isDark ? 'rgba(99,102,241,0.1)' : 'rgba(99,102,241,0.08)', 
                                             color: isDark ? '#818CF8' : '#4F46E5',
@@ -375,7 +375,7 @@ export default function LandingPage() {
                                         </Typography>
                                         <Box sx={{ p: 2, background: isDark ? '#000' : '#F4F4F5', borderRadius: 2, fontFamily: 'monospace', fontSize: 12, color: isDark ? '#A1A1AA' : '#52525B' }}>
                                             curl -X POST \ <br/>
-                                            &nbsp;&nbsp;https://api.nexusml.com/v1/predict \ <br/>
+                                            &nbsp;&nbsp;https://api.parametrix.in/v1/predict \ <br/>
                                             &nbsp;&nbsp;-H "Authorization: Bearer nx_key123" \ <br/>
                                             &nbsp;&nbsp;-d '{"{"} "age": 24, "city": "NYC" {"}"}'
                                         </Box>
@@ -410,7 +410,7 @@ export default function LandingPage() {
                                             <br/>
                                             clf = RandomForestClassifier(n_estimators=100)<br/>
                                             clf.fit(X_train, y_train)<br/>
-                                            nexusml.hub.push(clf, tags=[<span style={{ color: '#10B981' }}>"prod"</span>])
+                                            parametrix.hub.push(clf, tags=[<span style={{ color: '#10B981' }}>"prod"</span>])
                                         </Box>
                                     </Card>
                                 </motion.div>
@@ -465,10 +465,10 @@ export default function LandingPage() {
                             <Box sx={{ width: 28, height: 28, borderRadius: '8px', background: isDark ? '#FAFAFA' : '#18181B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <LogoIcon sx={{ color: isDark ? '#09090B' : '#FFFFFF', fontSize: 14 }} />
                             </Box>
-                            <Typography variant="body1" fontWeight={800} letterSpacing="-0.5px">NexusML</Typography>
+                            <Typography variant="body1" fontWeight={800} letterSpacing="-0.5px">Parametrix AI</Typography>
                         </Box>
                         <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
-                            © {new Date().getFullYear()} NexusML Inc. All rights reserved. Built for the modern ML workflow.
+                            © {new Date().getFullYear()} Parametrix AI. All rights reserved. Built for the modern ML workflow.
                         </Typography>
                     </Box>
                 </Container>

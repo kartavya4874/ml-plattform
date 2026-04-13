@@ -1,5 +1,5 @@
 """
-NexusML - Rigorous Platform Validation & Stress Suite
+Parametrix AI - Rigorous Platform Validation & Stress Suite
 ======================================================
 Tests edge cases, authentication isolation, negative bounds, and concurrency.
 Runs alongside standard integration tests.
@@ -57,7 +57,7 @@ def api(method, path, token=None, **kwargs):
         return type('FakeResponse', (object,), {'status_code': 0, 'text': str(e), 'json': lambda: {}})()
 
 def create_user():
-    email = f"test_{uuid.uuid4().hex[:8]}@nexusmltest.com"
+    email = f"test_{uuid.uuid4().hex[:8]}@parametrixtest.com"
     password = "Str0ngPassword123!"
     r = api("POST", "/auth/register", json={"email": email, "password": password, "full_name": "Test User"})
     if r.status_code == 201:
@@ -196,7 +196,7 @@ def test_rate_limiting_stress():
 
 def main():
     print("=" * 60)
-    print("  NexusML Rigorous Validation & Stress Suite")
+    print("  Parametrix AI Rigorous Validation & Stress Suite")
     print(f"  Target URL: {BASE_URL}")
     print(f"  Started:    {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)

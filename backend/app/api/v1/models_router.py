@@ -172,7 +172,7 @@ async def download_model(
 
     storage = await StorageService.get_instance()
     try:
-        data = await storage.download_bytes(settings.MINIO_BUCKET_MODELS, model.artifact_path)
+        data = await storage.download_bytes(settings.R2_BUCKET_MODELS, model.artifact_path)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to retrieve model artifact from storage")
 

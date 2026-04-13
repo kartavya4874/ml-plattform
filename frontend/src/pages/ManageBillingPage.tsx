@@ -40,7 +40,7 @@ export default function ManageBillingPage() {
             const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
             const link = document.createElement('a')
             link.href = url
-            link.setAttribute('download', `NexusML_Invoice_${invoiceId.slice(0, 8).toUpperCase()}.pdf`)
+            link.setAttribute('download', `Parametrix_Invoice_${invoiceId.slice(0, 8).toUpperCase()}.pdf`)
             document.body.appendChild(link)
             link.click()
             link.parentNode?.removeChild(link)

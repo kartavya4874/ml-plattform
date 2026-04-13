@@ -204,7 +204,7 @@ async def download_invoice(
 
     c.setFillColor(ACCENT)
     c.setFont("Helvetica-Bold", 26)
-    c.drawString(40, h - 55, "NexusML")
+    c.drawString(40, h - 55, "Parametrix AI")
     c.setFont("Helvetica", 10)
     c.drawString(40, h - 72, "AI Model Training & Deployment Platform")
 
@@ -246,7 +246,7 @@ async def download_invoice(
 
     table_data = [
         ["Description", "Period", "Qty", "Amount"],
-        [f"NexusML {tier_name} Plan", f"{period_start} – {period_end}", "1", f"${invoice.amount_due:.2f}"],
+        [f"Parametrix AI {tier_name} Plan", f"{period_start} – {period_end}", "1", f"${invoice.amount_due:.2f}"],
     ]
 
     col_widths = [220, 160, 50, 85]
@@ -316,8 +316,8 @@ async def download_invoice(
 
     c.setFillColor(MUTED)
     c.setFont("Helvetica", 8)
-    c.drawString(40, footer_y, "NexusML — AI Model Training & Deployment Platform")
-    c.drawString(40, footer_y - 12, "Questions? Contact support@nexusml.io")
+    c.drawString(40, footer_y, "Parametrix AI — AI Model Training & Deployment Platform")
+    c.drawString(40, footer_y - 12, "Questions? Contact support@parametrix.in")
     c.drawRightString(w - 40, footer_y, f"Invoice {str(invoice.id)[:8].upper()}")
     c.drawRightString(w - 40, footer_y - 12, "Thank you for your business.")
 
@@ -329,6 +329,6 @@ async def download_invoice(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f'attachment; filename="NexusML_Invoice_{str(invoice.id)[:8].upper()}.pdf"'
+            "Content-Disposition": f'attachment; filename="Parametrix_Invoice_{str(invoice.id)[:8].upper()}.pdf"'
         },
     )

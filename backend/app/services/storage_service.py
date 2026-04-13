@@ -70,79 +70,73 @@ class LocalStorage(BaseStorage):
         return results
 
 
-class MinioStorage(BaseStorage):
+class R2Storage(BaseStorage):
     def __init__(self):
-        from minio import Minio
-        self._client = Minio(
-            endpoint=settings.MINIO_ENDPOINT,
-            access_key=settings.MINIO_ACCESS_KEY,
-            secret_key=settings.MINIO_SECRET_KEY,
-            secure=settings.MINIO_SECURE,
+        import boto3
+        from botocore.config import Config
+        self._s3 = boto3.client(
+            's3',
+            endpoint_url=f"https://{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com",
+            aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+            config=Config(signature_version='s3v4'),
         )
-        self._ready = False
 
     def _ensure_buckets(self):
-        if self._ready: return
-        try:
-            for bucket in (settings.MINIO_BUCKET_DATA, settings.MINIO_BUCKET_MODELS):
-                if not self._client.bucket_exists(bucket):
-                    self._client.make_bucket(bucket)
-            self._ready = True
-        except Exception as e:
-            log.error("minio.ensure_buckets.failed", error=str(e))
+        pass # Buckets should be pre-created in Cloudflare Dashboard
 
     async def upload_bytes(self, bucket: str, object_name: str, data: bytes, content_type: str = "application/octet-stream"):
         from functools import partial
-        self._ensure_buckets()
-        stream = BytesIO(data)
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
             None,
-            partial(self._client.put_object, bucket, object_name, stream, len(data), content_type=content_type),
+            partial(self._s3.put_object, Bucket=bucket, Key=object_name, Body=data, ContentType=content_type)
         )
 
     async def download_bytes(self, bucket: str, object_name: str) -> bytes:
         from functools import partial
-        self._ensure_buckets()
         loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None,
-            partial(self._client.get_object, bucket, object_name),
-        )
-        data = response.read()
-        response.close()
-        response.release_conn()
-        return data
+        try:
+            response = await loop.run_in_executor(
+                None,
+                partial(self._s3.get_object, Bucket=bucket, Key=object_name)
+            )
+            return response['Body'].read()
+        except Exception as e:
+            raise ValueError(f"File not found or error: {str(e)}")
 
     async def delete_object(self, bucket: str, object_name: str):
         from functools import partial
-        self._ensure_buckets()
         loop = asyncio.get_event_loop()
         try:
-            await loop.run_in_executor(None, partial(self._client.remove_object, bucket, object_name))
+            await loop.run_in_executor(None, partial(self._s3.delete_object, Bucket=bucket, Key=object_name))
         except Exception:
             pass
 
     async def presigned_url(self, bucket: str, object_name: str, expiry_hours: int = 1) -> str:
         from functools import partial
-        from datetime import timedelta
-        self._ensure_buckets()
         loop = asyncio.get_event_loop()
         url = await loop.run_in_executor(
             None,
-            partial(self._client.presigned_get_object, bucket, object_name, expires=timedelta(hours=expiry_hours)),
+            partial(
+                self._s3.generate_presigned_url,
+                'get_object',
+                Params={'Bucket': bucket, 'Key': object_name},
+                ExpiresIn=expiry_hours * 3600
+            )
         )
         return url
 
     async def list_objects(self, bucket: str, prefix: str = "") -> list[str]:
         from functools import partial
-        self._ensure_buckets()
         loop = asyncio.get_event_loop()
-        objects = await loop.run_in_executor(
+        response = await loop.run_in_executor(
             None,
-            partial(self._client.list_objects, bucket, prefix=prefix, recursive=True),
+            partial(self._s3.list_objects_v2, Bucket=bucket, Prefix=prefix)
         )
-        return [obj.object_name for obj in objects]
+        if 'Contents' in response:
+            return [obj['Key'] for obj in response['Contents']]
+        return []
 
 
 class MongoStorage(BaseStorage):
@@ -203,70 +197,6 @@ class MongoStorage(BaseStorage):
         return results
 
 
-class FirebaseStorage(BaseStorage):
-    def __init__(self):
-        import firebase_admin
-        from firebase_admin import credentials, storage
-        self._storage = storage
-        
-        if not firebase_admin._apps:
-            if not settings.FIREBASE_CREDENTIALS_JSON or not os.path.exists(settings.FIREBASE_CREDENTIALS_JSON):
-                log.warning("firebase.credentials.missing", hint="Check FIREBASE_CREDENTIALS_JSON")
-            else:
-                cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_JSON)
-                firebase_admin.initialize_app(cred, {
-                    "storageBucket": settings.FIREBASE_STORAGE_BUCKET,
-                })
-
-    def _get_bucket(self):
-        return self._storage.bucket(settings.FIREBASE_STORAGE_BUCKET)
-
-    def _obj_path(self, bucket: str, object_name: str) -> str:
-        """Map logical bucket (datasets/models) to a prefix inside the single Firebase bucket."""
-        return f"{bucket}/{object_name}"
-
-    async def upload_bytes(self, bucket: str, object_name: str, data: bytes, content_type: str = "application/octet-stream"):
-        b = self._get_bucket()
-        blob = b.blob(self._obj_path(bucket, object_name))
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, blob.upload_from_string, data, content_type)
-
-    async def download_bytes(self, bucket: str, object_name: str) -> bytes:
-        b = self._get_bucket()
-        blob = b.blob(self._obj_path(bucket, object_name))
-        loop = asyncio.get_event_loop()
-        exists = await loop.run_in_executor(None, blob.exists)
-        if not exists:
-            raise ValueError(f"File not found: {object_name}")
-        return await loop.run_in_executor(None, blob.download_as_bytes)
-
-    async def delete_object(self, bucket: str, object_name: str):
-        b = self._get_bucket()
-        blob = b.blob(self._obj_path(bucket, object_name))
-        loop = asyncio.get_event_loop()
-        try:
-            await loop.run_in_executor(None, blob.delete)
-        except Exception:
-            pass
-
-    async def presigned_url(self, bucket: str, object_name: str, expiry_hours: int = 1) -> str:
-        from datetime import timedelta
-        b = self._get_bucket()
-        blob = b.blob(self._obj_path(bucket, object_name))
-        loop = asyncio.get_event_loop()
-        def _get_url():
-            return blob.generate_signed_url(version="v4", expiration=timedelta(hours=expiry_hours), method="GET")
-        return await loop.run_in_executor(None, _get_url)
-
-    async def list_objects(self, bucket: str, prefix: str = "") -> list[str]:
-        b = self._get_bucket()
-        full_prefix = f"{bucket}/{prefix}" if prefix else f"{bucket}/"
-        loop = asyncio.get_event_loop()
-        def _list():
-            return [blob.name.replace(f"{bucket}/", "", 1) for blob in b.list_blobs(prefix=full_prefix)]
-        return await loop.run_in_executor(None, _list)
-
-
 class StorageService:
     _instance: "BaseStorage | None" = None
 
@@ -276,12 +206,11 @@ class StorageService:
             return cls._instance
 
         backend = settings.STORAGE_BACKEND.lower()
-        if backend == "minio":
+        if backend == "r2":
             try:
-                cls._instance = MinioStorage()
-                cls._instance._ensure_buckets()
+                cls._instance = R2Storage()
             except Exception as e:
-                log.warning("storage.minio.failed_fallback_to_local", error=str(e))
+                log.warning("storage.r2.failed_fallback_to_local", error=str(e))
                 cls._instance = LocalStorage()
         elif backend == "mongodb":
             try:
@@ -289,12 +218,6 @@ class StorageService:
                 cls._instance._get_fs("test")
             except Exception as e:
                 log.warning("storage.mongodb.failed_fallback_to_local", error=str(e))
-                cls._instance = LocalStorage()
-        elif backend == "firebase":
-            try:
-                cls._instance = FirebaseStorage()
-            except Exception as e:
-                log.warning("storage.firebase.failed_fallback_to_local", error=str(e))
                 cls._instance = LocalStorage()
         else:
             cls._instance = LocalStorage()

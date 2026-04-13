@@ -56,7 +56,7 @@ export default function LoginPage() {
                         <LogoIcon sx={{ color: '#000', fontSize: 22 }} />
                     </Box>
                     <Box>
-                        <Typography variant="h6" fontWeight={700}>NexusML</Typography>
+                        <Typography variant="h6" fontWeight={700}>Parametrix AI</Typography>
                         <Typography variant="caption" sx={{ color: 'text.secondary' }}>Train models without code</Typography>
                     </Box>
                 </Box>

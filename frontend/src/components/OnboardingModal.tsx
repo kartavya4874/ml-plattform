@@ -15,11 +15,11 @@ import {
     ArrowBack,
 } from '@mui/icons-material'
 
-const STORAGE_KEY = 'nexusml_onboarded'
+const STORAGE_KEY = 'parametrix_onboarded'
 
 const steps = [
     {
-        title: 'Welcome to NexusML',
+        title: 'Welcome to Parametrix AI',
         subtitle: 'Your No-Code AI Platform',
         content: (
             <Box sx={{ textAlign: 'center', py: 2 }}>

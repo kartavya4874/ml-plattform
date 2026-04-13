@@ -44,7 +44,7 @@ export default function RegisterPage() {
                         <LogoIcon sx={{ color: '#000', fontSize: 22 }} />
                     </Box>
                     <Box>
-                        <Typography variant="h6" fontWeight={700}>NexusML</Typography>
+                        <Typography variant="h6" fontWeight={700}>Parametrix AI</Typography>
                         <Typography variant="caption" sx={{ color: 'text.secondary' }}>Free to get started</Typography>
                     </Box>
                 </Box>

@@ -5,7 +5,7 @@ export const DocumentationPage: React.FC = () => {
   return (
     <Container maxWidth="md" sx={{ py: 6 }}>
       <Typography variant="h3" gutterBottom fontWeight="bold">
-        NexusML Help Center
+        Parametrix AI Help Center
       </Typography>
       <Typography variant="subtitle1" color="text.secondary" gutterBottom>
         Everything you need to know about preparing data, training models, and deploying your ML solutions.

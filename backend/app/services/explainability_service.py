@@ -25,7 +25,7 @@ class ExplainabilityService:
     async def _load_model(self, model_obj: MLModel):
         storage = await self._get_storage()
         artifact_bytes = await storage.download_bytes(
-            settings.MINIO_BUCKET_MODELS, model_obj.artifact_path
+            settings.R2_BUCKET_MODELS, model_obj.artifact_path
         )
         return pickle.loads(artifact_bytes)
 

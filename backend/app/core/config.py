@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # ── App ──────────────────────────────────────────────────────────────────
-    APP_NAME: str = "NoCode AI Platform"
+    APP_NAME: str = "Parametrix AI"
     APP_VERSION: str = "1.0.0"
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
@@ -30,18 +30,15 @@ class Settings(BaseSettings):
     # ── Redis ────────────────────────────────────────────────────────────────
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # ── MinIO ────────────────────────────────────────────────────────────────
-    MINIO_ENDPOINT: str = "localhost:9000"
-    MINIO_ACCESS_KEY: str = "minioadmin"
-    MINIO_SECRET_KEY: str = "minioadmin"
-    MINIO_SECURE: bool = False
-    MINIO_BUCKET_DATA: str = "datasets"
-    MINIO_BUCKET_MODELS: str = "models"
+    # ── Cloudflare R2 ────────────────────────────────────────────────────────
+    R2_ACCOUNT_ID: str = ""
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
+    R2_BUCKET_DATA: str = "datasets"
+    R2_BUCKET_MODELS: str = "models"
 
     # ── Storage Alternative Backends ─────────────────────────────────────────
-    STORAGE_BACKEND: str = "local" # options: "local", "minio", "mongodb", "firebase"
-    FIREBASE_CREDENTIALS_JSON: str = "" # Path to firebase service account json
-    FIREBASE_STORAGE_BUCKET: str = "" # Firebase Storage bucket name (e.g. "your-project.appspot.com")
+    STORAGE_BACKEND: str = "local" # options: "local", "r2", "mongodb"
     API_BASE_URL: str = "http://localhost:8000" # Used for local/mongodb presigned URLs
 
 
@@ -50,7 +47,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASS: str = ""
-    EMAIL_FROM: str = "noreply@nocode-ai.platform"
+    EMAIL_FROM: str = "noreply@parametrix.in"
 
     # ── File Limits (bytes) ──────────────────────────────────────────────────
     MAX_FILE_SIZE_FREE: int = 100 * 1024 * 1024        # 100 MB

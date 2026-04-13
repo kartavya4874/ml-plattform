@@ -13,7 +13,7 @@ from app.core.config import settings
 async def load_dataset_df(dataset: Dataset) -> pd.DataFrame:
     """Download dataset from storage and load into a pandas DataFrame."""
     storage = await StorageService.get_instance()
-    content = await storage.download_bytes(settings.MINIO_BUCKET_DATA, dataset.minio_path)
+    content = await storage.download_bytes(settings.R2_BUCKET_DATA, dataset.minio_path)
     path = dataset.minio_path.lower()
 
     if path.endswith(".xlsx") or path.endswith(".xls"):

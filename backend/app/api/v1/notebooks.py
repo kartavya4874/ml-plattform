@@ -419,7 +419,7 @@ async def import_dataset(notebook_id: uuid.UUID, dataset_id: uuid.UUID, current_
     from app.services.storage_service import StorageService
     storage = await StorageService.get_instance()
     try:
-        data = await storage.download_bytes(settings.MINIO_BUCKET_DATA, ds.minio_path)
+        data = await storage.download_bytes(settings.R2_BUCKET_DATA, ds.minio_path)
     except Exception:
         raise HTTPException(500, "Failed to download dataset from storage")
 

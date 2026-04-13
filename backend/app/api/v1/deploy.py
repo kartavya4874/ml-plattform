@@ -151,9 +151,9 @@ async def export_model(
     from app.services.storage_service import StorageService
     storage = await StorageService.get_instance()
     if format == "onnx" and model_obj.onnx_path:
-        url = await storage.presigned_url(settings.MINIO_BUCKET_MODELS, model_obj.onnx_path)
+        url = await storage.presigned_url(settings.R2_BUCKET_MODELS, model_obj.onnx_path)
     else:
-        url = await storage.presigned_url(settings.MINIO_BUCKET_MODELS, model_obj.artifact_path)
+        url = await storage.presigned_url(settings.R2_BUCKET_MODELS, model_obj.artifact_path)
 
     return {"download_url": url, "format": format, "expires_in_seconds": 3600}
 

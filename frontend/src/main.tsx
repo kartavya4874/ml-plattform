@@ -13,7 +13,7 @@ import type { RootState } from './store/store'
 injectStore(store)
 
 // Sync data-theme attribute on initial load
-const savedTheme = localStorage.getItem('nexusml_theme') || 'dark'
+const savedTheme = localStorage.getItem('parametrix_theme') || 'dark'
 document.documentElement.setAttribute('data-theme', savedTheme)
 
 function ThemedApp() {

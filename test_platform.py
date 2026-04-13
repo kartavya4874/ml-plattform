@@ -1,5 +1,5 @@
 """
-NexusML - Full Platform Integration Test Suite
+Parametrix AI - Full Platform Integration Test Suite
 ================================================
 Tests all API endpoints end-to-end against a running backend.
 Requirements: pip install requests  (already in stdlib for the backend)
@@ -83,7 +83,7 @@ def test_server_health():
 
 def test_auth():
     print("\n--- Authentication ---")
-    email = f"test_{uuid.uuid4().hex[:6]}@nexusmltest.com"
+    email = f"test_{uuid.uuid4().hex[:6]}@parametrixtest.com"
     password = "TestPass123!"
     
     # Register
@@ -309,7 +309,7 @@ def test_notebooks(token):
     
     # Update with cells
     cells = [
-        {"type": "code", "source": "print('Hello from NexusML!')", "outputs": []},
+        {"type": "code", "source": "print('Hello from Parametrix AI!')", "outputs": []},
         {"type": "code", "source": "import numpy as np\nprint(f'NumPy version: {np.__version__}')", "outputs": []},
         {"type": "code", "source": "import pandas as pd\ndf = pd.DataFrame({'a': [1,2,3], 'b': [4,5,6]})\nprint(df.to_string())", "outputs": []},
     ]
@@ -317,12 +317,12 @@ def test_notebooks(token):
     check(r and r.status_code == 200, "Save cells to notebook")
     
     # Execute cell 0 — simple print
-    r = api("POST", f"/notebooks/{nb_id}/execute", token=token, json={"cell_index": 0, "source": "print('Hello from NexusML!')"})
+    r = api("POST", f"/notebooks/{nb_id}/execute", token=token, json={"cell_index": 0, "source": "print('Hello from Parametrix AI!')"})
     exec_ok = check(r and r.status_code == 200, "Execute cell (print)", f"outputs={r.json().get('outputs') if r else []}")
     if exec_ok and r:
         data = r.json()
-        has_output = any(o.get("content", "").strip() == "Hello from NexusML!" for o in data.get("outputs", []))
-        check(has_output, "Cell output correct", f"expected 'Hello from NexusML!'")
+        has_output = any(o.get("content", "").strip() == "Hello from Parametrix AI!" for o in data.get("outputs", []))
+        check(has_output, "Cell output correct", f"expected 'Hello from Parametrix AI!'")
         check(data.get("error") is None, "No execution error")
     
     # Execute cell 1 — numpy import
@@ -495,7 +495,7 @@ def main():
             BASE_URL = sys.argv[i + 1]
     
     print("=" * 60)
-    print(f"  NexusML Platform Integration Tests")
+    print(f"  Parametrix AI Platform Integration Tests")
     print(f"  Base URL: {BASE_URL}")
     print(f"  Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)

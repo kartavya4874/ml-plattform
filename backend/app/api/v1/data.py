@@ -79,7 +79,7 @@ async def upload_dataset(
     dataset_id = uuid.uuid4()
     minio_path = f"{current_user.id}/{dataset_id}/{file.filename}"
     await storage.upload_bytes(
-        bucket=settings.MINIO_BUCKET_DATA,
+        bucket=settings.R2_BUCKET_DATA,
         object_name=minio_path,
         data=content,
         content_type=file.content_type or "application/octet-stream",
@@ -196,7 +196,7 @@ async def download_dataset(
     _check_dataset_access(dataset, current_user)
 
     try:
-        data = await storage.download_bytes(settings.MINIO_BUCKET_DATA, dataset.minio_path)
+        data = await storage.download_bytes(settings.R2_BUCKET_DATA, dataset.minio_path)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to retrieve file from storage")
 
@@ -223,7 +223,7 @@ async def delete_dataset(
         raise HTTPException(status_code=403, detail="Only owner can delete dataset")
 
     # Delete from MinIO
-    await storage.delete_object(settings.MINIO_BUCKET_DATA, dataset.minio_path)
+    await storage.delete_object(settings.R2_BUCKET_DATA, dataset.minio_path)
 
     await dataset.delete()
 
@@ -304,7 +304,7 @@ async def transform_dataset(
     new_version = dataset.version + 1
     new_minio_path = f"{current_user.id}/{dataset.id}/v{new_version}.csv"
     await storage.upload_bytes(
-        bucket=settings.MINIO_BUCKET_DATA,
+        bucket=settings.R2_BUCKET_DATA,
         object_name=new_minio_path,
         data=content,
         content_type="text/csv",
@@ -400,7 +400,7 @@ async def auto_fix_dataset(
         raise HTTPException(status_code=400, detail="Auto-fix only works on tabular datasets")
 
     # Load original
-    content = await storage.download_bytes(settings.MINIO_BUCKET_DATA, dataset.minio_path)
+    content = await storage.download_bytes(settings.R2_BUCKET_DATA, dataset.minio_path)
     path = dataset.minio_path.lower()
     if path.endswith((".xlsx", ".xls")):
         df = pd.read_excel(io.BytesIO(content))
@@ -445,7 +445,7 @@ async def auto_fix_dataset(
     clean_name = f"cleaned_{dataset.name}" if not dataset.name.startswith("cleaned_") else dataset.name
     clean_path = f"{current_user.id}/{dataset_id}/{clean_name}"
     await storage.upload_bytes(
-        bucket=settings.MINIO_BUCKET_DATA,
+        bucket=settings.R2_BUCKET_DATA,
         object_name=clean_path,
         data=cleaned_csv,
         content_type="text/csv",
@@ -503,7 +503,7 @@ async def compute_feature_importance(
     if dataset.dataset_type != "tabular":
         raise HTTPException(status_code=400, detail="Only tabular datasets supported")
 
-    content = await storage.download_bytes(settings.MINIO_BUCKET_DATA, dataset.minio_path)
+    content = await storage.download_bytes(settings.R2_BUCKET_DATA, dataset.minio_path)
     path = dataset.minio_path.lower()
     
     # Try reading it with pandas

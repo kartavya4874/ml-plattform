@@ -127,7 +127,7 @@ async def _run_training_background(
             raise ValueError("Dataset not found")
 
         storage = await StorageService.get_instance()
-        content = await storage.download_bytes(settings.MINIO_BUCKET_DATA, dataset.minio_path)
+        content = await storage.download_bytes(settings.R2_BUCKET_DATA, dataset.minio_path)
         await publish({"message": f"📂 Loaded dataset: {dataset.name} ({dataset.row_count} rows)", "pct": 15})
 
         path = dataset.minio_path.lower()
@@ -364,7 +364,7 @@ async def _run_training_background(
             model_path = f"{owner_id}/{job_id}/model.pkl"
             storage = await StorageService.get_instance()
             await storage.upload_bytes(
-                bucket=settings.MINIO_BUCKET_MODELS,
+                bucket=settings.R2_BUCKET_MODELS,
                 object_name=model_path,
                 data=model_bytes,
                 content_type="application/octet-stream",

@@ -59,7 +59,7 @@ def run_training_job(
 
         from app.services.storage_service import StorageService
         storage = StorageService()
-        file_bytes = await storage.download_bytes(settings.MINIO_BUCKET_DATA, dataset.minio_path)
+        file_bytes = await storage.download_bytes(settings.R2_BUCKET_DATA, dataset.minio_path)
 
         _publish_progress(r, job_id, "progress", {"message": "Dataset loaded from storage", "pct": 10})
 
