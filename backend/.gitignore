@@ -1,0 +1,9 @@
+venv/
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+notebook_workspaces/
+storage/
+.ipynb_checkpoints/
+.DS_Store
