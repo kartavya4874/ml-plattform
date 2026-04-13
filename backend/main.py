@@ -11,6 +11,7 @@ import structlog
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
+from app.core.limiter import limiter
 from app.api.v1.auth import router as auth_router
 from app.api.v1.data import router as data_router
 from app.api.v1.training import router as training_router
@@ -30,7 +31,6 @@ from app.api.v1.admin import router as admin_router
 from app.api.v1.notifications import router as notifications_router
 
 log = structlog.get_logger()
-limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager

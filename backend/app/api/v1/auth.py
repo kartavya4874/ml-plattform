@@ -18,6 +18,7 @@ from app.services.email_service import send_verification_email
 from app.services.storage_service import StorageService
 import redis.asyncio as aioredis
 from app.core.config import settings
+from app.core.limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,9 @@ async def get_current_user(
 
 
 @router.post("/register", response_model=UserOut, status_code=201)
+@limiter.limit("5/minute")
 async def register(
+    request: Request,
     body: UserRegister,
     background_tasks: BackgroundTasks,
 ):
@@ -97,9 +100,11 @@ async def register(
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: UserLogin):
+@limiter.limit("10/minute")
+async def login(request: Request, body: UserLogin):
     """Authenticate and return access + refresh tokens."""
-    user = await User.find_one(User.email == body.email)
+    # Use case-insensitive search so legacy accounts with caps in the DB still match
+    user = await User.find_one({"email": {"$regex": f"^{body.email}$", "$options": "i"}})
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     if not user.is_active:
@@ -174,8 +179,34 @@ async def update_me(body: UserUpdate, current_user: User = Depends(get_current_u
         current_user.github_url = body.github_url
     if body.kaggle_url is not None:
         current_user.kaggle_url = body.kaggle_url
+    if body.is_2fa_enabled is not None:
+        current_user.is_2fa_enabled = body.is_2fa_enabled
     await current_user.save()
     return current_user
+
+
+@router.delete("/me", status_code=204)
+async def delete_me(
+    current_user: User = Depends(get_current_user),
+    redis_client=Depends(get_redis),
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)
+):
+    """Permanently delete user account and some associated data."""
+    # Delete org memberships
+    from app.models.models import OrgMembership
+    await OrgMembership.find(OrgMembership.user_id == current_user.id).delete()
+    
+    # Optional: Delete datasets/models or orphan them
+    # For now, we'll just physically drop the user
+    await current_user.delete()
+    
+    # Revoke tokens
+    token = credentials.credentials
+    if redis_client is not None:
+        try:
+            await redis_client.setex(f"revoked:{token}", 86400, "1")
+        except Exception:
+            pass
 
 
 @router.post("/me/avatar", response_model=UserOut)

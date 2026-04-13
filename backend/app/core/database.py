@@ -59,6 +59,47 @@ async def init_db():
         ],
         allow_index_dropping=False
     )
+    
+    await seed_admins_from_env()
+
+async def seed_admins_from_env():
+    """Seed initial admin users from environment variable ADMIN_USERS_SEED."""
+    import structlog
+    from app.models.models import User, UserRole
+    from app.core.security import hash_password
+    
+    if not settings.ADMIN_USERS_SEED:
+        return
+        
+    log = structlog.get_logger()
+    pairs = settings.ADMIN_USERS_SEED.split(",")
+    for pair in pairs:
+        pair = pair.strip()
+        if not pair or ":" not in pair:
+            continue
+        try:
+            email, password = pair.split(":", 1)
+            email = email.lower().strip()
+            password = password.strip()
+            
+            if not email or not password:
+                continue
+                
+            existing = await User.find_one(User.email == email)
+            if not existing:
+                admin_user = User(
+                    email=email,
+                    hashed_password=hash_password(password),
+                    full_name="System Admin",
+                    role=UserRole.admin,
+                    is_active=True,
+                    is_verified=True,
+                    slug=email.split("@")[0]
+                )
+                await admin_user.insert()
+                log.info("admin.seeded", email=email)
+        except Exception as e:
+            log.error("admin.seed.failed", error=str(e), pair=pair)
 
 async def close_db():
     """Close MongoDB connection."""

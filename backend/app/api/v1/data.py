@@ -479,3 +479,77 @@ async def auto_fix_dataset(
         "new_shape": list(df.shape),
         "new_version": dataset.version,
     }
+
+
+class FeatureImportanceRequest(BaseModel):
+    target_column: str
+    task_type: str = "classification"  # classification or regression
+
+@router.post("/datasets/{dataset_id}/feature-importance")
+async def compute_feature_importance(
+    dataset_id: uuid.UUID,
+    body: FeatureImportanceRequest,
+    current_user: User = Depends(get_current_user),
+    storage: StorageService = Depends(StorageService.get_instance)
+):
+    """Compute feature importance using a fast RandomForest on a sample of data."""
+    import pandas as pd
+    import numpy as np
+    
+    dataset = await Dataset.get(dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    if dataset.dataset_type != "tabular":
+        raise HTTPException(status_code=400, detail="Only tabular datasets supported")
+
+    content = await storage.download_bytes(settings.MINIO_BUCKET_DATA, dataset.minio_path)
+    path = dataset.minio_path.lower()
+    
+    # Try reading it with pandas
+    try:
+        if path.endswith((".xlsx", ".xls")):
+            df = pd.read_excel(io.BytesIO(content))
+        elif path.endswith(".parquet"):
+            df = pd.read_parquet(io.BytesIO(content))
+        else:
+            df = pd.read_csv(io.BytesIO(content))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Could not parse dataset file")
+        
+    df = df.sample(n=min(5000, len(df)))
+        
+    if body.target_column not in df.columns:
+        raise HTTPException(status_code=400, detail=f"Target column '{body.target_column}' not found")
+        
+    y = df[body.target_column]
+    X = df.drop(columns=[body.target_column])
+    
+    # Very basic Preprocess
+    numeric_cols = X.select_dtypes(include="number").columns
+    cat_cols = X.select_dtypes(exclude="number").columns
+    for c in numeric_cols: X[c] = X[c].fillna(X[c].median())
+    for c in cat_cols: 
+        X[c] = X[c].fillna("unknown").astype("category").cat.codes
+        
+    mask = y.notna()
+    X, y = X[mask], y[mask]
+    
+    try:
+        if body.task_type == "classification":
+            if not pd.api.types.is_numeric_dtype(y):
+                y = y.astype("category").cat.codes
+            from sklearn.ensemble import RandomForestClassifier
+            model = RandomForestClassifier(n_estimators=50, max_depth=5, random_state=42, n_jobs=-1)
+        else:
+            from sklearn.ensemble import RandomForestRegressor
+            model = RandomForestRegressor(n_estimators=50, max_depth=5, random_state=42, n_jobs=-1)
+            
+        model.fit(X, y)
+        importances = model.feature_importances_
+        
+        result = sorted(zip(X.columns, importances.tolist()), key=lambda x: x[1], reverse=True)[:20]
+        return {"feature_importance": [{"feature": f, "importance": round(imp, 4)} for f, imp in result]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compute feature importance: {str(e)}")
+

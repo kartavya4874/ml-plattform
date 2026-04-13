@@ -1,7 +1,7 @@
 """Discussion Forum routes - /api/v1/discussions"""
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import uuid
 from datetime import datetime
 from app.api.v1.auth import get_current_user
@@ -22,13 +22,13 @@ class CommentOut(BaseModel):
     replies: list["CommentOut"] = []
     
 class DiscussionCreate(BaseModel):
-    title: str
-    content: str
+    title: str = Field(..., max_length=255)
+    content: str = Field(..., max_length=50000)
     resource_type: Optional[str] = None
     resource_id: Optional[uuid.UUID] = None
 
 class CommentCreate(BaseModel):
-    content: str
+    content: str = Field(..., max_length=10000)
     parent_id: Optional[uuid.UUID] = None
 
 class DiscussionOut(BaseModel):

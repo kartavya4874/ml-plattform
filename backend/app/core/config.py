@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     CORS_ORIGINS: str | List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    ADMIN_USERS_SEED: str = "" # Comma separated list of email:password for initial superadmins
 
     # ── Database ─────────────────────────────────────────────────────────────
     MONGODB_URL: str = "mongodb://localhost:27017"

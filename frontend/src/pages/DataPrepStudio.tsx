@@ -334,6 +334,12 @@ export default function DataPrepStudio() {
     const [transforming, setTransforming] = useState(false)
     const [snackMsg, setSnackMsg] = useState('')
 
+    // Feature tools
+    const [autoFixing, setAutoFixing] = useState(false)
+    const [featureImportance, setFeatureImportance] = useState<any>(null)
+    const [targetCol, setTargetCol] = useState('')
+    const [fiLoading, setFiLoading] = useState(false)
+
     // Load dataset detail
     useEffect(() => {
         if (!id) return
@@ -400,6 +406,35 @@ export default function DataPrepStudio() {
         }
     }
 
+    const handleAutoFix = async () => {
+        if (!id || !window.confirm("This will automatically clean and create a new version of the dataset. Proceed?")) return;
+        setAutoFixing(true);
+        try {
+            const res = await api.post(`/data/datasets/${id}/auto-fix`);
+            setSnackMsg("Auto-fix complete! " + res.data.message);
+            const { data: ds } = await api.get(`/data/datasets/${id}`);
+            setDataset(ds);
+            setEda(null); setSample(null);
+        } catch (e: any) {
+            setSnackMsg(e.response?.data?.detail || "Auto-fix failed.");
+        } finally {
+            setAutoFixing(false);
+        }
+    }
+
+    const fetchFeatureImportance = async () => {
+        if (!id || !targetCol) return;
+        setFiLoading(true);
+        try {
+            const res = await api.post(`/data/datasets/${id}/feature-importance`, { target_column: targetCol });
+            setFeatureImportance(res.data.feature_importance);
+        } catch (e: any) {
+            setSnackMsg(e.response?.data?.detail || "Failed to compute feature importance.");
+        } finally {
+            setFiLoading(false);
+        }
+    }
+
     if (loading) return (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>
     )
@@ -429,6 +464,11 @@ export default function DataPrepStudio() {
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                         {dataset.row_count?.toLocaleString()} rows · {dataset.column_count} columns · {dataset.quality_score ? `${dataset.quality_score}% quality` : 'processing...'}
                     </Typography>
+                </Box>
+                <Box sx={{ flexShrink: 0 }}>
+                    <Button variant="contained" color="secondary" onClick={handleAutoFix} disabled={autoFixing} startIcon={autoFixing ? <CircularProgress size={16} color="inherit" /> : <TransformIcon />}>
+                        {autoFixing ? 'Fixing Data...' : 'Auto-Fix Data'}
+                    </Button>
                 </Box>
             </Box>
 
@@ -707,6 +747,38 @@ export default function DataPrepStudio() {
                                     </Card>
                                 </Box>
                             )}
+
+                            {/* Feature Importance */}
+                            <Box mb={4}>
+                                <Typography variant="h6" fontWeight={700} mb={2}>🎯 Feature Importance (Random Forest)</Typography>
+                                <Card sx={{ borderRadius: '12px' }}>
+                                    <CardContent sx={{ p: 2.5 }}>
+                                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 3 }}>
+                                            <FormControl size="small" sx={{ width: 200 }}>
+                                                <InputLabel>Target Column</InputLabel>
+                                                <Select value={targetCol} label="Target Column" onChange={e => setTargetCol(e.target.value as string)}>
+                                                    {columnNames.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                                                </Select>
+                                            </FormControl>
+                                            <Button variant="outlined" disabled={!targetCol || fiLoading} onClick={fetchFeatureImportance} startIcon={fiLoading ? <CircularProgress size={16} /> : <BarChart />}>Calculate Importance</Button>
+                                        </Box>
+
+                                        {featureImportance && (
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                {Object.entries(featureImportance).map(([col, imp]: [string, any]) => (
+                                                    <Box key={col} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                        <Typography variant="body2" sx={{ width: 140, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{col}</Typography>
+                                                        <Box sx={{ flex: 1, height: 10, background: 'rgba(255,255,255,0.05)', borderRadius: 5 }}>
+                                                            <Box sx={{ height: '100%', width: `${imp * 100}%`, background: 'linear-gradient(90deg, #10B981, #34D399)', borderRadius: 5, transition: 'width 0.5s' }} />
+                                                        </Box>
+                                                        <Typography variant="caption" sx={{ width: 60, textAlign: 'right' }}>{(imp * 100).toFixed(2)}%</Typography>
+                                                    </Box>
+                                                ))}
+                                            </Box>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </Box>
                         </>
                     ) : (
                         <Alert severity="info">Could not load EDA data. Dataset may only support tabular format.</Alert>

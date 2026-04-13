@@ -25,6 +25,13 @@ class UserRegister(BaseModel):
     password: str
     full_name: str | None = None
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def lower_email(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.lower()
+        return v
+
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
@@ -42,6 +49,7 @@ class UserUpdate(BaseModel):
     website: str | None = None
     github_url: str | None = None
     kaggle_url: str | None = None
+    is_2fa_enabled: bool | None = None
 
 
 class UserPasswordUpdate(BaseModel):
@@ -59,6 +67,13 @@ class UserPasswordUpdate(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def lower_email(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.lower()
+        return v
 
 
 class TokenResponse(BaseModel):
@@ -88,6 +103,7 @@ class UserOut(BaseModel):
     role: UserRole
     is_active: bool
     is_verified: bool
+    is_2fa_enabled: bool = False
     slug: str
     created_at: datetime
 

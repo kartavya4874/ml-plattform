@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
+import { motion } from 'framer-motion'
 import {
     Box, Drawer, AppBar, Toolbar, Typography, IconButton,
     Avatar, Tooltip, Badge, Chip, Popover, List, ListItemButton,
@@ -308,9 +309,17 @@ export default function Layout() {
 
                 <Box
                     className="bg-animated"
-                    sx={{ flex: 1, p: 3, overflowY: 'auto' }}
+                    sx={{ flex: 1, p: 3, overflowY: 'auto', position: 'relative' }}
                 >
-                    <Outlet />
+                    <motion.div
+                        key={location.pathname}
+                        initial={{ opacity: 0, y: 15, filter: 'blur(4px)' }}
+                        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                        transition={{ duration: 0.25, ease: 'easeOut' }}
+                        style={{ height: '100%' }}
+                    >
+                        <Outlet />
+                    </motion.div>
                 </Box>
             </Box>
         </Box>

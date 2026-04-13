@@ -154,3 +154,15 @@ async def admin_update_subscription(user_id: uuid.UUID, tier: str, current_user:
     sub.tier = SubscriptionTier(tier)
     await sub.save()
     return {"message": f"User subscription updated to {tier}"}
+
+from app.models.models import AuditLog
+
+@router.get("/audit-logs", response_model=list)
+async def list_audit_logs(limit: int = 100, current_user: User = Depends(get_current_user)):
+    _require_admin(current_user)
+    logs = await AuditLog.find().sort(-AuditLog.created_at).limit(limit).to_list()
+    return [{"id": str(l.id), "user_id": str(l.user_id) if l.user_id else None, 
+             "action": l.action, "resource_type": l.resource_type, 
+             "resource_id": l.resource_id, "ip_address": l.ip_address,
+             "created_at": l.created_at.isoformat()} for l in logs]
+

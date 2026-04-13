@@ -149,7 +149,10 @@ export default function DataExplorer() {
                             {datasets.map((ds) => (
                                 <TableRow key={ds.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/data/${ds.id}`)}>
                                     <TableCell>
-                                        <Typography variant="body2" fontWeight={600}>{ds.name}</Typography>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <Typography variant="body2" fontWeight={600}>{ds.name}</Typography>
+                                            <Chip label={`v${ds.version || 1}`} size="small" sx={{ height: 18, fontSize: 10, fontWeight: 700, background: 'rgba(99,102,241,0.12)', color: '#818CF8' }} />
+                                        </Box>
                                         <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                                             {new Date(ds.created_at).toLocaleDateString()}
                                         </Typography>

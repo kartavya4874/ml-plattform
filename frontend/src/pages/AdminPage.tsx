@@ -13,14 +13,15 @@ export default function AdminPage() {
     const [datasets, setDatasets] = useState<any[]>([])
     const [models, setModels] = useState<any[]>([])
     const [discussions, setDiscussions] = useState<any[]>([])
+    const [auditLogs, setAuditLogs] = useState<any[]>([])
 
     const loadData = async () => {
         try {
-            const [st, u, d, m, di] = await Promise.all([
+            const [st, u, d, m, di, al] = await Promise.all([
                 api.get('/admin/stats'), api.get('/admin/users'), api.get('/admin/datasets'),
-                api.get('/admin/models'), api.get('/admin/discussions'),
+                api.get('/admin/models'), api.get('/admin/discussions'), api.get('/admin/audit-logs'),
             ])
-            setStats(st.data); setUsers(u.data); setDatasets(d.data); setModels(m.data); setDiscussions(di.data)
+            setStats(st.data); setUsers(u.data); setDatasets(d.data); setModels(m.data); setDiscussions(di.data); setAuditLogs(al.data);
         } catch (e) { console.error(e) }
     }
 
@@ -94,6 +95,7 @@ export default function AdminPage() {
                 <Tab label={`Datasets (${datasets.length})`} />
                 <Tab label={`Models (${models.length})`} />
                 <Tab label={`Discussions (${discussions.length})`} />
+                <Tab label={`Audit Logs (${auditLogs.length})`} />
             </Tabs>
 
             {tab === 0 && (
@@ -185,6 +187,27 @@ export default function AdminPage() {
                                     <TableCell>{d.upvotes}</TableCell>
                                     <TableCell>{new Date(d.created_at).toLocaleDateString()}</TableCell>
                                     <TableCell><IconButton size="small" color="error" onClick={() => deleteDiscussion(d.id)}><DeleteIcon fontSize="small" /></IconButton></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            )}
+
+            {tab === 4 && (
+                <TableContainer component={Card}>
+                    <Table size="small">
+                        <TableHead><TableRow>
+                            <TableCell>Action</TableCell><TableCell>Resource</TableCell><TableCell>User ID</TableCell><TableCell>IP</TableCell><TableCell>Created</TableCell>
+                        </TableRow></TableHead>
+                        <TableBody>
+                            {auditLogs.map(l => (
+                                <TableRow key={l.id}>
+                                    <TableCell><Chip size="small" label={l.action} color="secondary" /></TableCell>
+                                    <TableCell>{l.resource_type} {l.resource_id ? `(${l.resource_id.slice(0, 8)})` : ''}</TableCell>
+                                    <TableCell>{l.user_id ? l.user_id.slice(0, 8) : 'System'}</TableCell>
+                                    <TableCell>{l.ip_address || '—'}</TableCell>
+                                    <TableCell>{new Date(l.created_at).toLocaleString()}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>

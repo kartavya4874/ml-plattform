@@ -48,6 +48,19 @@ export default function NotebookEditor() {
         }
     }, [id])
 
+    // Global keyboard shortcuts
+    useEffect(() => {
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault()
+                if (activeFile) saveFile()
+                else saveNotebook()
+            }
+        }
+        window.addEventListener('keydown', handleGlobalKeyDown)
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown)
+    }, [notebook, activeFile, fileContent])
+
     const loadFiles = () => {
         if (id) api.get(`/notebooks/${id}/files`).then(r => setFiles(r.data)).catch(() => {})
     }
@@ -89,6 +102,11 @@ export default function NotebookEditor() {
             setNotebook({ ...notebook, cells })
         } catch (e) { console.error(e) }
         setRunning(null)
+    }
+
+    const exportToIpynb = () => {
+        if (!notebook) return
+        window.location.href = `http://localhost:8000/api/v1/notebooks/${notebook.id}/export`;
     }
 
     // ── File management ─────────────────────────────────────────────────────
@@ -224,6 +242,9 @@ export default function NotebookEditor() {
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexShrink: 0 }}>
                         <FormControlLabel control={<Switch size="small" checked={notebook.is_public} onChange={e => setNotebook({ ...notebook, is_public: e.target.checked })} />}
                             label={<Typography variant="caption">Public</Typography>} />
+                        <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={exportToIpynb}>
+                            Export
+                        </Button>
                         <Button variant="contained" size="small" startIcon={<SaveIcon />} onClick={saveNotebook} disabled={saving}>
                             {saving ? 'Saving...' : 'Save'}
                         </Button>
@@ -265,6 +286,12 @@ export default function NotebookEditor() {
                                     </Box>
                                     <TextField fullWidth multiline minRows={3} maxRows={20} value={cell.source}
                                         onChange={e => updateCell(i, e.target.value)}
+                                        onKeyDown={e => {
+                                            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                                                e.preventDefault()
+                                                if (cell.type === 'code') runCell(i)
+                                            }
+                                        }}
                                         sx={{
                                             '& .MuiOutlinedInput-root': { borderRadius: 0, fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: 13, background: '#050505' },
                                             '& fieldset': { border: 'none' },

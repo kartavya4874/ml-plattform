@@ -484,3 +484,59 @@ async def fork_notebook(notebook_id: uuid.UUID, current_user: User = Depends(get
     await ForkModel(original_id=nb.id, original_type="notebook", forked_id=copy.id, forked_by=current_user.id).insert()
     await Activity(user_id=current_user.id, action="forked", resource_type="notebook", resource_id=nb.id).insert()
     return copy
+
+
+from fastapi.responses import Response
+
+@router.get("/{notebook_id}/export")
+async def export_notebook_ipynb(notebook_id: uuid.UUID, current_user: User = Depends(get_current_user)):
+    """Export notebook to .ipynb JSON format."""
+    nb = await Notebook.get(notebook_id)
+    if not nb:
+        raise HTTPException(404, "Notebook not found")
+    if nb.owner_id != current_user.id and not nb.is_public:
+        raise HTTPException(403, "Not authorized")
+
+    ipynb = {
+        "cells": [],
+        "metadata": {
+            "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
+            "language_info": {"codemirror_mode": {"name": "ipython", "version": 3}, "file_extension": ".py", "mimetype": "text/x-python", "name": "python", "nbconvert_exporter": "python", "pygments_lexer": "ipython3", "version": "3.11.0"}
+        },
+        "nbformat": 4,
+        "nbformat_minor": 5
+    }
+
+    for cell in nb.cells:
+        cell_type = "markdown" if cell.get("type") == "markdown" else "code"
+        source = [line + "\n" for line in cell.get("source", "").split("\n")]
+        if source and source[-1].endswith("\n"):
+            source[-1] = source[-1][:-1]
+            
+        c = {"cell_type": cell_type, "metadata": {}, "source": source}
+        
+        if cell_type == "code":
+            c["execution_count"] = None
+            c["outputs"] = []
+            
+            for out in cell.get("outputs", []):
+                t = out.get("type", "text")
+                content = [line + "\n" for line in out.get("content", "").split("\n")]
+                if content and content[-1].endswith("\n"):
+                    content[-1] = content[-1][:-1]
+                    
+                if t == "error":
+                    c["outputs"].append({"output_type": "error", "ename": "Error", "evalue": "", "traceback": content})
+                elif t == "stderr":
+                    c["outputs"].append({"output_type": "stream", "name": "stderr", "text": content})
+                else:
+                    c["outputs"].append({"output_type": "stream", "name": "stdout", "text": content})
+                    
+        ipynb["cells"].append(c)
+
+    import json
+    return Response(
+        content=json.dumps(ipynb, indent=1),
+        media_type="application/x-ipynb+json",
+        headers={"Content-Disposition": f'attachment; filename="{nb.title}.ipynb"'}
+    )

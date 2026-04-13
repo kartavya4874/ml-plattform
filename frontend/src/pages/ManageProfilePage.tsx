@@ -17,6 +17,7 @@ export default function ManageProfilePage() {
     const [website, setWebsite] = useState(user?.website || '')
     const [githubUrl, setGithubUrl] = useState(user?.github_url || '')
     const [kaggleUrl, setKaggleUrl] = useState(user?.kaggle_url || '')
+    const [is2FA, setIs2FA] = useState(user?.is_2fa_enabled || false)
     
     // Avatar upload
     const [avatarFile, setAvatarFile] = useState<File | null>(null)
@@ -35,8 +36,9 @@ export default function ManageProfilePage() {
         e.preventDefault()
         setProfileError('')
         setProfileSuccess('')
+        setProfileSuccess('')
         try {
-            await api.put('/auth/me', { full_name: fullName, email, username, is_public: isPublic, bio, website, github_url: githubUrl, kaggle_url: kaggleUrl })
+            await api.put('/auth/me', { full_name: fullName, email, username, is_public: isPublic, bio, website, github_url: githubUrl, kaggle_url: kaggleUrl, is_2fa_enabled: is2FA })
             if (avatarFile) {
                 const formData = new FormData();
                 formData.append('file', avatarFile);
@@ -70,6 +72,16 @@ export default function ManageProfilePage() {
             setNewPassword('')
         } catch (err: any) {
             setPasswordError(err.response?.data?.detail || 'Failed to update password.')
+        }
+    }
+
+    const handleDeleteAccount = async () => {
+        if (!window.confirm("Are you ABSOLUTELY sure you want to delete your account? This action cannot be undone.")) return;
+        try {
+            await api.delete('/auth/me');
+            window.location.href = '/login'; // Redirect to login
+        } catch (err) {
+            alert('Failed to delete account.');
         }
     }
 
@@ -127,6 +139,11 @@ export default function ManageProfilePage() {
                         label="Make profile public to the community"
                     />
 
+                    <FormControlLabel
+                        control={<Switch checked={is2FA} onChange={(e) => setIs2FA(e.target.checked)} color="primary" />}
+                        label="Enable Two-Factor Authentication (2FA)"
+                    />
+
                     <TextField label="Bio" value={bio} onChange={e => setBio(e.target.value)} fullWidth multiline rows={3} helperText="Tell the community about yourself" />
                     <TextField label="Website" value={website} onChange={e => setWebsite(e.target.value)} fullWidth placeholder="https://yoursite.com" />
                     <TextField label="GitHub URL" value={githubUrl} onChange={e => setGithubUrl(e.target.value)} fullWidth placeholder="https://github.com/username" />
@@ -160,6 +177,16 @@ export default function ManageProfilePage() {
                     />
                     <Button type="submit" variant="contained" color="secondary" sx={{ alignSelf: 'flex-start' }}>Update Password</Button>
                 </Box>
+            </Paper>
+
+            <Paper sx={{ p: 4, background: '#1a0505', border: '1px solid #ff4444', borderRadius: 3 }}>
+                <Typography variant="h6" fontWeight={600} mb={1} color="error">Danger Zone</Typography>
+                <Typography variant="body2" color="text.secondary" mb={3}>
+                    Permanently delete your account and all associated datasets, models, and deployments.
+                </Typography>
+                <Button variant="contained" color="error" onClick={handleDeleteAccount}>
+                    Delete Account
+                </Button>
             </Paper>
         </Box>
     )

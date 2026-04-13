@@ -72,6 +72,7 @@ class User(Document):
     role: UserRole = UserRole.free
     is_active: bool = True
     is_verified: bool = False
+    is_2fa_enabled: bool = False
     verification_token: Optional[str] = None
     slug: Indexed(str, unique=True)
     username: Optional[Indexed(str, unique=True)] = None

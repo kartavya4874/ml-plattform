@@ -28,6 +28,21 @@ import ModelComparison from './pages/ModelComparison'
 import ApiKeysPage from './pages/ApiKeysPage'
 import NotFoundPage from './pages/NotFoundPage'
 import LandingPage from './pages/LandingPage'
+import OrganizationManagementPage from './pages/OrganizationManagementPage'
+import DocumentationPage from './pages/DocumentationPage'
+import CommandPalette from './components/CommandPalette'
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+
+/** Global hooks wrapper that needs to be inside Router context */
+function GlobalHooks() {
+  useKeyboardShortcuts()
+  return (
+    <>
+      <CommandPalette />
+      <Outlet />
+    </>
+  )
+}
 
 /** Guard: redirects to /login if no access token */
 function RequireAuth() {
@@ -51,11 +66,12 @@ export default function App() {
 
       {/* Protected routes — auth guard first, then layout shell */}
       <Route element={<RequireAuth />}>
-        <Route element={<Layout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/data" element={<DataExplorer />} />
-          <Route path="/data/:id" element={<DataPrepStudio />} />
-          <Route path="/train" element={<TrainingStudio />} />
+        <Route element={<GlobalHooks />}>
+          <Route element={<Layout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/data" element={<DataExplorer />} />
+            <Route path="/data/:id" element={<DataPrepStudio />} />
+            <Route path="/train" element={<TrainingStudio />} />
           <Route path="/models" element={<ModelHub />} />
           <Route path="/models/compare" element={<ModelComparison />} />
           <Route path="/models/:id" element={<ModelDetail />} />
@@ -78,9 +94,12 @@ export default function App() {
           <Route path="/profile" element={<ManageProfilePage />} />
           <Route path="/api-keys" element={<ApiKeysPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/organizations" element={<OrganizationManagementPage />} />
+          <Route path="/docs" element={<DocumentationPage />} />
 
           <Route path="/model-hub" element={<Navigate to="/models" replace />} />
           <Route path="*" element={<NotFoundPage />} />
+        </Route>
         </Route>
       </Route>
     </Routes>
