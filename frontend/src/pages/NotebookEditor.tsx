@@ -61,6 +61,15 @@ export default function NotebookEditor() {
         return () => window.removeEventListener('keydown', handleGlobalKeyDown)
     }, [notebook, activeFile, fileContent])
 
+    // Auto-save on 1 minute idle
+    useEffect(() => {
+        if (!notebook) return
+        const timer = setTimeout(() => {
+            saveNotebook()
+        }, 60000)
+        return () => clearTimeout(timer)
+    }, [notebook])
+
     const loadFiles = () => {
         if (id) api.get(`/notebooks/${id}/files`).then(r => setFiles(r.data)).catch(() => {})
     }
@@ -302,6 +311,7 @@ export default function NotebookEditor() {
                                         </Box>
                                     </Box>
                                     <TextField fullWidth multiline minRows={3} maxRows={20} value={cell.source}
+                                        id={`cell-input-${i}`}
                                         onChange={e => updateCell(i, e.target.value)}
                                         onKeyDown={e => {
                                             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -312,9 +322,9 @@ export default function NotebookEditor() {
                                                 if (cell.type === 'code') runCell(i)
                                                 if (i === notebook.cells.length - 1) {
                                                     addCell('code')
+                                                    setTimeout(() => document.getElementById(`cell-input-${i + 1}`)?.focus(), 50)
                                                 } else {
-                                                    // Optionally implement standard Alt+Enter to always create cell:
-                                                    // addCell('code', i)
+                                                    setTimeout(() => document.getElementById(`cell-input-${i + 1}`)?.focus(), 50)
                                                 }
                                             }
                                         }}
