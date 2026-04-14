@@ -381,6 +381,7 @@ async def get_dataset_sample(
 @router.post("/datasets/{dataset_id}/auto-fix")
 async def auto_fix_dataset(
     dataset_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     storage: StorageService = Depends(StorageService.get_instance),
 ):
@@ -462,14 +463,12 @@ async def auto_fix_dataset(
     await dataset.save()
 
     # Re-profile the cleaned dataset
-    await asyncio.get_event_loop().run_in_executor(
-        None,
-        lambda: asyncio.run(profile_dataset(
-            dataset_id=str(dataset_id),
-            minio_path=clean_path,
-            dataset_type="tabular",
-            file_content=cleaned_csv,
-        ))
+    background_tasks.add_task(
+        profile_dataset,
+        dataset_id=str(dataset_id),
+        minio_path=clean_path,
+        dataset_type=DatasetType.tabular,
+        file_content=cleaned_csv,
     )
 
     return {
