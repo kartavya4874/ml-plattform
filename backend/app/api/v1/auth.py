@@ -27,15 +27,27 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 bearer_scheme = HTTPBearer()
 
 
+_redis_client = None
+_redis_unavailable = False
+
 async def get_redis():
     """Return a Redis client, or None if Redis is unavailable."""
-    try:
-        r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
-        await r.ping()  # verify connectivity
-        return r
-    except Exception:
-        logger.warning("Redis is unavailable — token revocation features are disabled.")
+    global _redis_client, _redis_unavailable
+    
+    if _redis_unavailable:
         return None
+        
+    if _redis_client is None:
+        try:
+            r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+            await r.ping()  # verify connectivity
+            _redis_client = r
+        except Exception:
+            _redis_unavailable = True
+            logger.warning("Redis is unavailable — token revocation features are disabled.")
+            return None
+            
+    return _redis_client
 
 
 async def get_current_user(

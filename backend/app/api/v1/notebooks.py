@@ -130,7 +130,7 @@ def _create_venv_if_needed(notebook_id: uuid.UUID) -> str:
 
 # ── CRUD ─────────────────────────────────────────────────────────────────────
 
-@router.post("/", response_model=NotebookOut, status_code=201)
+@router.post("", response_model=NotebookOut, status_code=201)
 async def create_notebook(body: NotebookCreate, current_user: User = Depends(get_current_user)):
     nb = Notebook(owner_id=current_user.id, title=body.title, description=body.description)
     await nb.insert()
@@ -139,7 +139,7 @@ async def create_notebook(body: NotebookCreate, current_user: User = Depends(get
     return nb
 
 
-@router.get("/", response_model=List[NotebookOut])
+@router.get("", response_model=List[NotebookOut])
 async def list_notebooks(current_user: User = Depends(get_current_user)):
     return await Notebook.find(Notebook.owner_id == current_user.id).sort(-Notebook.updated_at).to_list()
 
