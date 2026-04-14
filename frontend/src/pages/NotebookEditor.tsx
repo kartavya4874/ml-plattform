@@ -72,9 +72,16 @@ export default function NotebookEditor() {
         setNotebook({ ...notebook, cells })
     }
 
-    const addCell = (type: 'code' | 'markdown') => {
+    const addCell = (type: 'code' | 'markdown', insertAfterIndex?: number) => {
         if (!notebook) return
-        setNotebook({ ...notebook, cells: [...notebook.cells, { type, source: '', outputs: [] }] })
+        const newCell: Cell = { type, source: '', outputs: [] }
+        const newCells = [...notebook.cells]
+        if (insertAfterIndex !== undefined) {
+            newCells.splice(insertAfterIndex + 1, 0, newCell)
+        } else {
+            newCells.push(newCell)
+        }
+        setNotebook({ ...notebook, cells: newCells })
     }
 
     const deleteCell = (index: number) => {
@@ -291,6 +298,15 @@ export default function NotebookEditor() {
                                             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                                                 e.preventDefault()
                                                 if (cell.type === 'code') runCell(i)
+                                            } else if (e.shiftKey && e.key === 'Enter') {
+                                                e.preventDefault()
+                                                if (cell.type === 'code') runCell(i)
+                                                if (i === notebook.cells.length - 1) {
+                                                    addCell('code')
+                                                } else {
+                                                    // Optionally implement standard Alt+Enter to always create cell:
+                                                    // addCell('code', i)
+                                                }
                                             }
                                         }}
                                         sx={{
