@@ -66,27 +66,33 @@ export default function NotebookEditor() {
     }
 
     const updateCell = (index: number, source: string) => {
-        if (!notebook) return
-        const cells = [...notebook.cells]
-        cells[index] = { ...cells[index], source }
-        setNotebook({ ...notebook, cells })
+        setNotebook(prev => {
+            if (!prev) return prev;
+            const cells = [...prev.cells]
+            cells[index] = { ...cells[index], source }
+            return { ...prev, cells }
+        })
     }
 
     const addCell = (type: 'code' | 'markdown', insertAfterIndex?: number) => {
-        if (!notebook) return
-        const newCell: Cell = { type, source: '', outputs: [] }
-        const newCells = [...notebook.cells]
-        if (insertAfterIndex !== undefined) {
-            newCells.splice(insertAfterIndex + 1, 0, newCell)
-        } else {
-            newCells.push(newCell)
-        }
-        setNotebook({ ...notebook, cells: newCells })
+        setNotebook(prev => {
+            if (!prev) return prev;
+            const newCell: Cell = { type, source: '', outputs: [] }
+            const newCells = [...prev.cells]
+            if (insertAfterIndex !== undefined) {
+                newCells.splice(insertAfterIndex + 1, 0, newCell)
+            } else {
+                newCells.push(newCell)
+            }
+            return { ...prev, cells: newCells }
+        })
     }
 
     const deleteCell = (index: number) => {
-        if (!notebook || notebook.cells.length <= 1) return
-        setNotebook({ ...notebook, cells: notebook.cells.filter((_, i) => i !== index) })
+        setNotebook(prev => {
+            if (!prev || prev.cells.length <= 1) return prev;
+            return { ...prev, cells: prev.cells.filter((_, i) => i !== index) }
+        })
     }
 
     const saveNotebook = async () => {
@@ -103,10 +109,13 @@ export default function NotebookEditor() {
         setRunning(index)
         try {
             const res = await api.post(`/notebooks/${notebook.id}/execute`, { cell_index: index, source: notebook.cells[index].source })
-            const cells = [...notebook.cells]
-            cells[index] = { ...cells[index], outputs: res.data.outputs || [] }
-            if (res.data.error) cells[index].outputs.push({ type: 'error', content: res.data.error })
-            setNotebook({ ...notebook, cells })
+            setNotebook(prev => {
+                if (!prev) return prev;
+                const cells = [...prev.cells]
+                cells[index] = { ...cells[index], outputs: res.data.outputs || [] }
+                if (res.data.error) cells[index].outputs.push({ type: 'error', content: res.data.error })
+                return { ...prev, cells }
+            })
         } catch (e) { console.error(e) }
         setRunning(null)
     }
