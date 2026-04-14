@@ -18,7 +18,7 @@ from app.core.config import settings
 router = APIRouter(prefix="/notebooks", tags=["Notebooks"])
 
 # Base directory for notebook workspaces
-NOTEBOOKS_DIR = Path(os.environ.get("NOTEBOOKS_DIR", "./notebook_workspaces"))
+NOTEBOOKS_DIR = Path(os.environ.get("NOTEBOOKS_DIR", "./notebook_workspaces")).resolve()
 NOTEBOOKS_DIR.mkdir(parents=True, exist_ok=True)
 
 # These packages are available from the system/backend Python environment
