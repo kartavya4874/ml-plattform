@@ -328,6 +328,20 @@ async def create_file(notebook_id: uuid.UUID, body: NotebookFileCreate, current_
     if not safe_name or safe_name.startswith("."):
         raise HTTPException(400, "Invalid filename")
 
+    # Validate extension
+    allowed_extensions = {
+        ".py", ".csv", ".txt", ".json", ".md", ".yaml", ".yml", ".toml",
+        ".tsv", ".xml", ".html", ".css", ".js", ".sh", ".sql", ".r",
+    }
+    file_ext = os.path.splitext(safe_name)[1].lower()
+    if not file_ext:
+        raise HTTPException(400, "Filename must include an extension (e.g., script.py)")
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            415,
+            f"Unsupported extension '{file_ext}'. Allowed: {', '.join(sorted(allowed_extensions))}"
+        )
+
     ws = _get_workspace(notebook_id)
     filepath = ws / safe_name
     filepath.write_text(body.content, encoding="utf-8")
@@ -447,12 +461,115 @@ async def upload_file_to_notebook(
     if len(content) > 100 * 1024 * 1024:  # 100MB limit
         raise HTTPException(413, "File too large (max 100MB)")
 
-    ws = _get_workspace(notebook_id)
     filename = file.filename or "uploaded_file"
+    
+    # Validate file extension
+    allowed_extensions = {
+        ".py", ".csv", ".txt", ".json", ".md", ".yaml", ".yml", ".toml",
+        ".tsv", ".xml", ".html", ".css", ".js", ".sh", ".bat", ".sql",
+        ".ipynb", ".pkl", ".joblib", ".npy", ".npz", ".parquet",
+        ".xlsx", ".xls", ".zip", ".png", ".jpg", ".jpeg", ".gif", ".svg",
+    }
+    file_ext = os.path.splitext(filename)[1].lower()
+    if file_ext and file_ext not in allowed_extensions:
+        raise HTTPException(
+            415,
+            f"Unsupported file type '{file_ext}'. Allowed: {', '.join(sorted(allowed_extensions))}"
+        )
+
     safe_name = filename.replace("..", "").replace("/", "").replace("\\", "")
+    ws = _get_workspace(notebook_id)
     (ws / safe_name).write_bytes(content)
 
     return {"filename": safe_name, "size_bytes": len(content)}
+
+
+@router.post("/{notebook_id}/import-ipynb", response_model=NotebookOut)
+async def import_ipynb(
+    notebook_id: uuid.UUID,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Import a .ipynb file: parse its cells into the notebook."""
+    import json as json_module
+    
+    nb = await Notebook.get(notebook_id)
+    if not nb:
+        raise HTTPException(404, "Notebook not found")
+    if nb.owner_id != current_user.id:
+        raise HTTPException(403, "Not authorized")
+
+    filename = file.filename or ""
+    if not filename.lower().endswith(".ipynb"):
+        raise HTTPException(415, "Only .ipynb files are supported for notebook import")
+
+    content = await file.read()
+    if len(content) > 50 * 1024 * 1024:  # 50MB limit
+        raise HTTPException(413, "File too large (max 50MB)")
+
+    try:
+        ipynb_data = json_module.loads(content.decode("utf-8"))
+    except (json_module.JSONDecodeError, UnicodeDecodeError):
+        raise HTTPException(400, "Invalid .ipynb file — could not parse JSON")
+
+    if "cells" not in ipynb_data:
+        raise HTTPException(400, "Invalid .ipynb file — no cells found")
+
+    # Convert ipynb cells to our internal cell format
+    imported_cells = []
+    for cell in ipynb_data.get("cells", []):
+        cell_type = cell.get("cell_type", "code")
+        if cell_type not in ("code", "markdown", "raw"):
+            cell_type = "code"
+        if cell_type == "raw":
+            cell_type = "code"  # Treat raw cells as code
+
+        # Source can be a string or list of strings
+        source = cell.get("source", "")
+        if isinstance(source, list):
+            source = "".join(source)
+        
+        # Parse outputs
+        outputs = []
+        for out in cell.get("outputs", []):
+            out_type = out.get("output_type", "")
+            if out_type == "stream":
+                text = out.get("text", "")
+                if isinstance(text, list):
+                    text = "".join(text)
+                stream_name = out.get("name", "stdout")
+                outputs.append({
+                    "type": "stderr" if stream_name == "stderr" else "text",
+                    "content": text,
+                })
+            elif out_type == "error":
+                tb = out.get("traceback", [])
+                if isinstance(tb, list):
+                    tb = "\n".join(tb)
+                outputs.append({"type": "error", "content": tb})
+            elif out_type in ("display_data", "execute_result"):
+                data = out.get("data", {})
+                if "text/plain" in data:
+                    text = data["text/plain"]
+                    if isinstance(text, list):
+                        text = "".join(text)
+                    outputs.append({"type": "text", "content": text})
+
+        imported_cells.append({
+            "type": "markdown" if cell_type == "markdown" else "code",
+            "source": source,
+            "outputs": outputs,
+        })
+
+    if not imported_cells:
+        imported_cells = [{"type": "code", "source": "", "outputs": []}]
+
+    nb.cells = imported_cells
+    nb.title = filename.rsplit(".", 1)[0] if not nb.title or nb.title == "Untitled Notebook" else nb.title
+    from app.models.models import utcnow
+    nb.updated_at = utcnow()
+    await nb.save()
+    return nb
 
 
 # ── Fork ─────────────────────────────────────────────────────────────────────
@@ -489,8 +606,16 @@ async def fork_notebook(notebook_id: uuid.UUID, current_user: User = Depends(get
 from fastapi.responses import Response
 
 @router.get("/{notebook_id}/export")
-async def export_notebook_ipynb(notebook_id: uuid.UUID, current_user: User = Depends(get_current_user)):
-    """Export notebook to .ipynb JSON format."""
+async def export_notebook_ipynb(
+    notebook_id: uuid.UUID,
+    token: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+):
+    """Export notebook to .ipynb JSON format.
+    
+    Supports auth via Authorization header OR ?token= query param
+    (needed for browser download via window.location.href).
+    """
     nb = await Notebook.get(notebook_id)
     if not nb:
         raise HTTPException(404, "Notebook not found")
@@ -509,11 +634,12 @@ async def export_notebook_ipynb(notebook_id: uuid.UUID, current_user: User = Dep
 
     for cell in nb.cells:
         cell_type = "markdown" if cell.get("type") == "markdown" else "code"
-        source = [line + "\n" for line in cell.get("source", "").split("\n")]
-        if source and source[-1].endswith("\n"):
-            source[-1] = source[-1][:-1]
+        source = cell.get("source", "") or ""
+        source_lines = [line + "\n" for line in source.split("\n")]
+        if source_lines and source_lines[-1].endswith("\n"):
+            source_lines[-1] = source_lines[-1][:-1]
             
-        c = {"cell_type": cell_type, "metadata": {}, "source": source}
+        c = {"cell_type": cell_type, "metadata": {}, "source": source_lines}
         
         if cell_type == "code":
             c["execution_count"] = None
@@ -521,7 +647,8 @@ async def export_notebook_ipynb(notebook_id: uuid.UUID, current_user: User = Dep
             
             for out in cell.get("outputs", []):
                 t = out.get("type", "text")
-                content = [line + "\n" for line in out.get("content", "").split("\n")]
+                content_str = out.get("content", "") or ""
+                content = [line + "\n" for line in content_str.split("\n")]
                 if content and content[-1].endswith("\n"):
                     content[-1] = content[-1][:-1]
                     
@@ -535,8 +662,11 @@ async def export_notebook_ipynb(notebook_id: uuid.UUID, current_user: User = Dep
         ipynb["cells"].append(c)
 
     import json
+    # Sanitize filename for Content-Disposition header
+    safe_title = "".join(c for c in nb.title if c.isalnum() or c in " _-").strip() or "notebook"
     return Response(
         content=json.dumps(ipynb, indent=1),
         media_type="application/x-ipynb+json",
-        headers={"Content-Disposition": f'attachment; filename="{nb.title}.ipynb"'}
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}.ipynb"'}
     )
+

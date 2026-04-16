@@ -4,19 +4,21 @@ import {
     CircularProgress, Divider, Collapse, Alert, Avatar
 } from '@mui/material'
 import {
-    ThumbUp as UpvoteIcon, Reply as ReplyIcon, Add as AddIcon,
+    ThumbUp as UpvoteIcon, ThumbUpOffAlt as UpvoteOutlinedIcon, Reply as ReplyIcon, Add as AddIcon,
     Forum as ForumIcon, ExpandMore, ExpandLess, Send as SendIcon
 } from '@mui/icons-material'
 import { api } from '../api/client'
 
 interface Comment {
     id: string; author_id: string; author_name: string; content: string;
-    upvotes: number; created_at: string; parent_id: string | null; replies: Comment[]
+    upvotes: number; created_at: string; parent_id: string | null; replies: Comment[];
+    user_voted?: boolean
 }
 
 interface Discussion {
     id: string; author_id: string; title: string; content: string;
-    upvotes: number; comment_count: number; created_at: string
+    upvotes: number; comment_count: number; created_at: string;
+    user_voted?: boolean
 }
 
 const CommentThread = ({ comment, depth = 0, discussionId, onRefresh }: {
@@ -26,6 +28,15 @@ const CommentThread = ({ comment, depth = 0, discussionId, onRefresh }: {
     const [replyText, setReplyText] = useState('')
     const [collapsed, setCollapsed] = useState(depth > 2)
     const [submitting, setSubmitting] = useState(false)
+    const [localUpvotes, setLocalUpvotes] = useState(comment.upvotes)
+    const [localVoted, setLocalVoted] = useState(comment.user_voted ?? false)
+    const [upvoting, setUpvoting] = useState(false)
+
+    // Sync from props when parent refreshes
+    useEffect(() => {
+        setLocalUpvotes(comment.upvotes)
+        setLocalVoted(comment.user_voted ?? false)
+    }, [comment.upvotes, comment.user_voted])
 
     const handleReply = async () => {
         if (!replyText.trim()) return
@@ -36,8 +47,14 @@ const CommentThread = ({ comment, depth = 0, discussionId, onRefresh }: {
     }
 
     const handleUpvote = async () => {
-        await api.post(`/discussions/comments/${comment.id}/upvote`)
-        onRefresh()
+        if (upvoting) return
+        setUpvoting(true)
+        try {
+            const res = await api.post(`/discussions/comments/${comment.id}/upvote`)
+            setLocalUpvotes(res.data.upvotes)
+            setLocalVoted(res.data.user_voted)
+        } catch (e) { console.error(e) }
+        setUpvoting(false)
     }
 
     return (
@@ -55,10 +72,14 @@ const CommentThread = ({ comment, depth = 0, discussionId, onRefresh }: {
                     </Box>
                     <Typography variant="body2" sx={{ mt: 0.5, color: 'text.primary', whiteSpace: 'pre-wrap' }}>{comment.content}</Typography>
                     <Box sx={{ display: 'flex', gap: 1, mt: 0.5, alignItems: 'center' }}>
-                        <IconButton size="small" onClick={handleUpvote} sx={{ color: 'text.secondary' }}>
-                            <UpvoteIcon sx={{ fontSize: 14 }} />
+                        <IconButton size="small" onClick={handleUpvote} disabled={upvoting}
+                            sx={{ color: localVoted ? '#6366F1' : 'text.secondary', transition: 'color 0.2s' }}>
+                            {localVoted
+                                ? <UpvoteIcon sx={{ fontSize: 14 }} />
+                                : <UpvoteOutlinedIcon sx={{ fontSize: 14 }} />}
                         </IconButton>
-                        <Typography variant="caption" color="text.secondary">{comment.upvotes}</Typography>
+                        <Typography variant="caption" color={localVoted ? '#6366F1' : 'text.secondary'}
+                            sx={{ fontWeight: localVoted ? 700 : 400 }}>{localUpvotes}</Typography>
                         <Button size="small" startIcon={<ReplyIcon sx={{ fontSize: 12 }} />} onClick={() => setReplying(!replying)}
                             sx={{ fontSize: 11, color: 'text.secondary', textTransform: 'none' }}>Reply</Button>
                         {comment.replies.length > 0 && (
@@ -146,11 +167,19 @@ export default function DiscussionsPage() {
     }
 
     const handleUpvote = async (id: string) => {
-        await api.post(`/discussions/${id}/upvote`)
-        loadDiscussions()
-        if (selectedId === id && selectedDisc) {
-            setSelectedDisc({ ...selectedDisc, upvotes: selectedDisc.upvotes + 1 })
-        }
+        try {
+            const res = await api.post(`/discussions/${id}/upvote`)
+            // Update local state with server response
+            const newUpvotes = res.data.upvotes
+            const userVoted = res.data.user_voted
+            
+            setDiscussions(prev => prev.map(d =>
+                d.id === id ? { ...d, upvotes: newUpvotes, user_voted: userVoted } : d
+            ))
+            if (selectedId === id && selectedDisc) {
+                setSelectedDisc({ ...selectedDisc, upvotes: newUpvotes, user_voted: userVoted })
+            }
+        } catch (e) { console.error(e) }
     }
 
     return (
@@ -205,7 +234,15 @@ export default function DiscussionsPage() {
                                         {d.content}
                                     </Typography>
                                     <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                                        <Chip label={`👍 ${d.upvotes}`} size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleUpvote(d.id) }} sx={{ cursor: 'pointer' }} />
+                                        <Chip
+                                            icon={d.user_voted ? <UpvoteIcon sx={{ fontSize: 14 }} /> : <UpvoteOutlinedIcon sx={{ fontSize: 14 }} />}
+                                            label={d.upvotes}
+                                            size="small"
+                                            variant={d.user_voted ? "filled" : "outlined"}
+                                            color={d.user_voted ? "primary" : "default"}
+                                            onClick={(e) => { e.stopPropagation(); handleUpvote(d.id) }}
+                                            sx={{ cursor: 'pointer' }}
+                                        />
                                         <Chip label={`💬 ${d.comment_count}`} size="small" variant="outlined" />
                                         <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
                                             {new Date(d.created_at).toLocaleDateString()}
@@ -224,7 +261,15 @@ export default function DiscussionsPage() {
                                     <Typography variant="h5" fontWeight={800} mb={1}>{selectedDisc.title}</Typography>
                                     <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mb: 2 }}>{selectedDisc.content}</Typography>
                                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                                        <Chip label={`👍 ${selectedDisc.upvotes}`} onClick={() => handleUpvote(selectedDisc.id)} sx={{ cursor: 'pointer' }} size="small" />
+                                        <Chip
+                                            icon={selectedDisc.user_voted ? <UpvoteIcon sx={{ fontSize: 14 }} /> : <UpvoteOutlinedIcon sx={{ fontSize: 14 }} />}
+                                            label={selectedDisc.upvotes}
+                                            color={selectedDisc.user_voted ? "primary" : "default"}
+                                            variant={selectedDisc.user_voted ? "filled" : "outlined"}
+                                            onClick={() => handleUpvote(selectedDisc.id)}
+                                            sx={{ cursor: 'pointer' }}
+                                            size="small"
+                                        />
                                         <Typography variant="caption" color="text.secondary">
                                             {new Date(selectedDisc.created_at).toLocaleString()}
                                         </Typography>

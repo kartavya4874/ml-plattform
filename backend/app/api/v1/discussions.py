@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 import uuid
 from datetime import datetime
 from app.api.v1.auth import get_current_user
-from app.models.models import User, Discussion, Comment
+from app.models.models import User, Discussion, Comment, Vote
 
 router = APIRouter(prefix="/discussions", tags=["Discussions"])
 
@@ -73,11 +73,17 @@ async def list_discussions(resource_type: Optional[str] = None, resource_id: Opt
     return result
 
 @router.get("/{id}")
-async def get_discussion(id: uuid.UUID):
+async def get_discussion(id: uuid.UUID, current_user: User = Depends(get_current_user)):
     d = await Discussion.get(id)
     if not d: raise HTTPException(status_code=404, detail="Discussion not found")
     count = await Comment.find(Comment.discussion_id == d.id).count()
-    return {**d.dict(), "comment_count": count}
+    # Check if current user has voted
+    voted = await Vote.find_one(
+        Vote.user_id == current_user.id,
+        Vote.resource_type == "discussion",
+        Vote.resource_id == d.id,
+    )
+    return {**d.dict(), "comment_count": count, "user_voted": voted is not None}
 
 @router.post("/{discussion_id}/comments", response_model=CommentOut)
 async def add_comment(discussion_id: uuid.UUID, body: CommentCreate, current_user: User = Depends(get_current_user)):
@@ -101,15 +107,24 @@ async def add_comment(discussion_id: uuid.UUID, body: CommentCreate, current_use
     return {**c.dict(), "replies": []}
 
 @router.get("/{discussion_id}/comments")
-async def get_comments(discussion_id: uuid.UUID):
-    """Return comments as a threaded tree."""
+async def get_comments(discussion_id: uuid.UUID, current_user: User = Depends(get_current_user)):
+    """Return comments as a threaded tree with user_voted flags."""
     all_comments = await Comment.find(Comment.discussion_id == discussion_id).sort(+Comment.created_at).to_list()
+    
+    # Get all of this user's votes on comments in this discussion
+    comment_ids = [c.id for c in all_comments]
+    user_votes = await Vote.find(
+        Vote.user_id == current_user.id,
+        Vote.resource_type == "comment",
+        {"resource_id": {"$in": comment_ids}},
+    ).to_list()
+    voted_ids = {v.resource_id for v in user_votes}
     
     # Build tree
     by_id = {}
     roots = []
     for c in all_comments:
-        node = {**c.dict(), "replies": []}
+        node = {**c.dict(), "replies": [], "user_voted": c.id in voted_ids}
         by_id[c.id] = node
         if c.parent_id and c.parent_id in by_id:
             by_id[c.parent_id]["replies"].append(node)
@@ -119,16 +134,50 @@ async def get_comments(discussion_id: uuid.UUID):
 
 @router.post("/{id}/upvote")
 async def upvote_discussion(id: uuid.UUID, current_user: User = Depends(get_current_user)):
+    """Toggle upvote on a discussion. Returns new count and voted status."""
     d = await Discussion.get(id)
     if not d: raise HTTPException(status_code=404, detail="Discussion not found")
-    d.upvotes += 1
-    await d.save()
-    return d
+    
+    existing = await Vote.find_one(
+        Vote.user_id == current_user.id,
+        Vote.resource_type == "discussion",
+        Vote.resource_id == id,
+    )
+    
+    if existing:
+        # Already voted — remove the vote (toggle off)
+        await existing.delete()
+        d.upvotes = max(0, d.upvotes - 1)
+        await d.save()
+        return {"upvotes": d.upvotes, "user_voted": False}
+    else:
+        # New vote
+        vote = Vote(user_id=current_user.id, resource_type="discussion", resource_id=id)
+        await vote.insert()
+        d.upvotes += 1
+        await d.save()
+        return {"upvotes": d.upvotes, "user_voted": True}
 
 @router.post("/comments/{id}/upvote")
 async def upvote_comment(id: uuid.UUID, current_user: User = Depends(get_current_user)):
+    """Toggle upvote on a comment. Returns new count and voted status."""
     c = await Comment.get(id)
     if not c: raise HTTPException(status_code=404, detail="Comment not found")
-    c.upvotes += 1
-    await c.save()
-    return c
+    
+    existing = await Vote.find_one(
+        Vote.user_id == current_user.id,
+        Vote.resource_type == "comment",
+        Vote.resource_id == id,
+    )
+    
+    if existing:
+        await existing.delete()
+        c.upvotes = max(0, c.upvotes - 1)
+        await c.save()
+        return {"upvotes": c.upvotes, "user_voted": False}
+    else:
+        vote = Vote(user_id=current_user.id, resource_type="comment", resource_id=id)
+        await vote.insert()
+        c.upvotes += 1
+        await c.save()
+        return {"upvotes": c.upvotes, "user_voted": True}

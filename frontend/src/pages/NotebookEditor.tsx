@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import {
     Box, Typography, Button, TextField, IconButton, Chip, Switch, FormControlLabel,
@@ -8,7 +8,8 @@ import {
 import {
     PlayArrow as RunIcon, Add as AddIcon, Delete as DeleteIcon, Save as SaveIcon,
     Terminal as PkgIcon, InsertDriveFile as FileIcon, CloudUpload as UploadIcon,
-    Storage as DataIcon, Close as CloseIcon, Download as DownloadIcon
+    Storage as DataIcon, Close as CloseIcon, Download as DownloadIcon,
+    UploadFile as ImportIcon
 } from '@mui/icons-material'
 import { api } from '../api/client'
 
@@ -18,17 +19,25 @@ interface NbFile { filename: string; size_bytes: number }
 
 const SIDEBAR_WIDTH = 260
 
+// Allowed extensions for new file creation
+const ALLOWED_NEW_FILE_EXTENSIONS = [
+    '.py', '.csv', '.txt', '.json', '.md', '.yaml', '.yml', '.toml',
+    '.tsv', '.xml', '.html', '.css', '.js', '.sh', '.sql', '.r',
+]
+
 export default function NotebookEditor() {
     const { id } = useParams<{ id: string }>()
     const [notebook, setNotebook] = useState<NotebookData | null>(null)
     const [saving, setSaving] = useState(false)
     const [running, setRunning] = useState<number | null>(null)
+    const [exportError, setExportError] = useState<string | null>(null)
 
     // File manager
     const [files, setFiles] = useState<NbFile[]>([])
     const [activeFile, setActiveFile] = useState<string | null>(null)
     const [fileContent, setFileContent] = useState('')
     const [newFileName, setNewFileName] = useState('')
+    const [fileCreateError, setFileCreateError] = useState<string | null>(null)
 
     // Package installer
     const [pkgDialog, setPkgDialog] = useState(false)
@@ -40,6 +49,11 @@ export default function NotebookEditor() {
     const [dsDialog, setDsDialog] = useState(false)
     const [datasets, setDatasets] = useState<any[]>([])
     const [importing, setImporting] = useState<string | null>(null)
+
+    // ipynb import
+    const ipynbInputRef = useRef<HTMLInputElement>(null)
+    const [ipynbImporting, setIpynbImporting] = useState(false)
+    const [ipynbResult, setIpynbResult] = useState<string | null>(null)
 
     useEffect(() => {
         if (id) {
@@ -129,19 +143,94 @@ export default function NotebookEditor() {
         setRunning(null)
     }
 
-    const exportToIpynb = () => {
+    const exportToIpynb = async () => {
         if (!notebook) return
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
-        window.location.href = `${baseUrl}/notebooks/${notebook.id}/export`;
+        setExportError(null)
+        try {
+            const res = await api.get(`/notebooks/${notebook.id}/export`, {
+                responseType: 'blob',
+            })
+            // Create a download link from the blob
+            const blob = new Blob([res.data], { type: 'application/x-ipynb+json' })
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            // Get filename from Content-Disposition header or fallback
+            const disposition = res.headers['content-disposition']
+            let filename = `${notebook.title}.ipynb`
+            if (disposition) {
+                const match = disposition.match(/filename="?([^"]+)"?/)
+                if (match) filename = match[1]
+            }
+            a.download = filename
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
+        } catch (e: any) {
+            console.error('Export failed:', e)
+            setExportError(e.response?.data?.detail || 'Export failed. Please try again.')
+        }
+    }
+
+    // ── ipynb import ────────────────────────────────────────────────────────
+
+    const handleImportIpynb = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!id || !e.target.files?.[0]) return
+        const file = e.target.files[0]
+        if (!file.name.toLowerCase().endsWith('.ipynb')) {
+            setIpynbResult('❌ Only .ipynb files are supported')
+            return
+        }
+        setIpynbImporting(true)
+        setIpynbResult(null)
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            const res = await api.post(`/notebooks/${id}/import-ipynb`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            })
+            setNotebook(res.data)
+            setIpynbResult(`✅ Imported ${file.name} — ${res.data.cells?.length || 0} cells loaded`)
+        } catch (e: any) {
+            setIpynbResult(`❌ ${e.response?.data?.detail || 'Import failed'}`)
+        }
+        setIpynbImporting(false)
+        // Reset file input
+        if (ipynbInputRef.current) ipynbInputRef.current.value = ''
     }
 
     // ── File management ─────────────────────────────────────────────────────
 
     const createFile = async () => {
         if (!id || !newFileName.trim()) return
-        await api.post(`/notebooks/${id}/files`, { filename: newFileName.trim(), content: '' })
-        setNewFileName('')
-        loadFiles()
+        setFileCreateError(null)
+
+        const filename = newFileName.trim()
+        // Validate extension
+        const ext = filename.includes('.') ? '.' + filename.split('.').pop()!.toLowerCase() : ''
+        if (!ext) {
+            setFileCreateError('Filename must include an extension (e.g., script.py)')
+            return
+        }
+        if (!ALLOWED_NEW_FILE_EXTENSIONS.includes(ext)) {
+            setFileCreateError(`Unsupported extension '${ext}'. Try: ${ALLOWED_NEW_FILE_EXTENSIONS.join(', ')}`)
+            return
+        }
+        // Prevent path traversal
+        if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+            setFileCreateError('Invalid filename')
+            return
+        }
+
+        try {
+            await api.post(`/notebooks/${id}/files`, { filename, content: '' })
+            setNewFileName('')
+            setFileCreateError(null)
+            loadFiles()
+        } catch (e: any) {
+            setFileCreateError(e.response?.data?.detail || 'Failed to create file')
+        }
     }
 
     const openFile = async (filename: string) => {
@@ -167,8 +256,12 @@ export default function NotebookEditor() {
         if (!id || !e.target.files?.[0]) return
         const formData = new FormData()
         formData.append('file', e.target.files[0])
-        await api.post(`/notebooks/${id}/upload-file`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
-        loadFiles()
+        try {
+            await api.post(`/notebooks/${id}/upload-file`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+            loadFiles()
+        } catch (err: any) {
+            alert(err.response?.data?.detail || 'Upload failed')
+        }
     }
 
     // ── Package management ──────────────────────────────────────────────────
@@ -236,12 +329,17 @@ export default function NotebookEditor() {
                 </List>
 
                 <Box sx={{ p: 1.5, borderTop: '1px solid #1a1a1a' }}>
-                    <Box sx={{ display: 'flex', gap: 0.5, mb: 1 }}>
-                        <TextField size="small" placeholder="filename.py" value={newFileName} onChange={e => setNewFileName(e.target.value)}
+                    <Box sx={{ display: 'flex', gap: 0.5, mb: 0.5 }}>
+                        <TextField size="small" placeholder="filename.py" value={newFileName} onChange={e => { setNewFileName(e.target.value); setFileCreateError(null) }}
                             sx={{ flex: 1, '& input': { fontSize: 12, py: 0.5 } }}
                             onKeyDown={e => e.key === 'Enter' && createFile()} />
                         <IconButton size="small" onClick={createFile}><AddIcon sx={{ fontSize: 16 }} /></IconButton>
                     </Box>
+                    {fileCreateError && (
+                        <Typography variant="caption" color="error" sx={{ display: 'block', mb: 0.5, fontSize: 10, lineHeight: 1.3 }}>
+                            {fileCreateError}
+                        </Typography>
+                    )}
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
                         <Button size="small" variant="outlined" startIcon={<UploadIcon sx={{ fontSize: 14 }} />} component="label" sx={{ fontSize: 10, flex: 1 }}>
                             Upload <input type="file" hidden onChange={uploadFile} />
@@ -268,6 +366,11 @@ export default function NotebookEditor() {
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexShrink: 0 }}>
                         <FormControlLabel control={<Switch size="small" checked={notebook.is_public} onChange={e => setNotebook({ ...notebook, is_public: e.target.checked })} />}
                             label={<Typography variant="caption">Public</Typography>} />
+                        <Button variant="outlined" size="small" startIcon={<ImportIcon />} component="label"
+                            disabled={ipynbImporting}>
+                            {ipynbImporting ? 'Importing...' : '.ipynb'}
+                            <input type="file" accept=".ipynb" hidden onChange={handleImportIpynb} ref={ipynbInputRef} />
+                        </Button>
                         <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={exportToIpynb}>
                             Export
                         </Button>
@@ -276,6 +379,19 @@ export default function NotebookEditor() {
                         </Button>
                     </Box>
                 </Box>
+
+                {/* Status messages */}
+                {exportError && (
+                    <Alert severity="error" onClose={() => setExportError(null)} sx={{ mx: 2, mt: 1 }}>
+                        {exportError}
+                    </Alert>
+                )}
+                {ipynbResult && (
+                    <Alert severity={ipynbResult.startsWith('✅') ? 'success' : 'error'}
+                        onClose={() => setIpynbResult(null)} sx={{ mx: 2, mt: 1 }}>
+                        {ipynbResult}
+                    </Alert>
+                )}
 
                 {/* Content area */}
                 <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>

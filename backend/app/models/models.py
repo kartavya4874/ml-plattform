@@ -309,6 +309,19 @@ class Comment(Document):
         indexes = [[("discussion_id", 1), ("created_at", 1)]]
 
 
+class Vote(Document):
+    """Tracks per-user upvotes to prevent duplicate voting."""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    user_id: uuid.UUID
+    resource_type: str  # "discussion" | "comment"
+    resource_id: uuid.UUID
+    created_at: datetime = Field(default_factory=utcnow)
+
+    class Settings:
+        name = "votes"
+        indexes = [[("user_id", 1), ("resource_type", 1), ("resource_id", 1)]]
+
+
 # ─── Social Graph ────────────────────────────────────────────────────────────
 
 class Star(Document):

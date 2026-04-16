@@ -1,6 +1,7 @@
 """Data management routes — /api/v1/data/"""
 import uuid
 import io
+import os
 import asyncio
 from typing import Any
 from pydantic import BaseModel
@@ -63,12 +64,23 @@ async def upload_dataset(
             detail=f"File exceeds your tier's limit of {size_limit // (1024**2)} MB"
         )
 
+    # File extension validation
+    allowed_extensions = {".csv", ".xlsx", ".xls", ".parquet", ".zip", ".txt", ".json", ".tsv"}
+    filename = file.filename or "upload.csv"
+    file_ext = os.path.splitext(filename)[1].lower()
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported file extension '{file_ext}'. Allowed: {', '.join(sorted(allowed_extensions))}"
+        )
+
     # MIME validation
     allowed_mimes = {
         "text/csv", "application/vnd.ms-excel",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/zip", "application/x-zip-compressed",
         "text/plain", "application/octet-stream",
+        "application/json", "text/tab-separated-values",
     }
     if file.content_type and file.content_type not in allowed_mimes:
         raise HTTPException(status_code=415, detail=f"Unsupported file type: {file.content_type}")
