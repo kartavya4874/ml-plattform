@@ -85,7 +85,7 @@ export default function ContactUsPage() {
         setFormData(prev => ({ ...prev, [field]: e.target.value }))
     }
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!formData.name || !formData.email || !formData.message) {
             setSnackbar({ open: true, message: 'Please fill in all required fields.', severity: 'error' })
