@@ -483,3 +483,18 @@ class Notification(Document):
     class Settings:
         name = "notifications"
         indexes = [[("user_id", 1), ("created_at", -1)]]
+
+# ─── Contact Messages ────────────────────────────────────────────────────────
+
+class ContactMessage(Document):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    name: str
+    email: str
+    subject: str = ""
+    message: str
+    is_read: bool = False
+    created_at: datetime = Field(default_factory=utcnow)
+
+    class Settings:
+        name = "contact_messages"
+        indexes = [[("created_at", -1)]]

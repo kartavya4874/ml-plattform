@@ -29,6 +29,7 @@ from app.api.v1.competitions import router as competitions_router
 from app.api.v1.organizations import router as organizations_router
 from app.api.v1.admin import router as admin_router
 from app.api.v1.notifications import router as notifications_router
+from app.api.v1.contact import router as contact_router
 
 log = structlog.get_logger()
 
@@ -98,6 +99,7 @@ app.include_router(competitions_router, prefix=prefix)
 app.include_router(organizations_router, prefix=prefix)
 app.include_router(admin_router, prefix=prefix)
 app.include_router(notifications_router, prefix=prefix)
+app.include_router(contact_router, prefix=prefix)
 
 # ── Global Exception Handler ───────────────────────────────────────────────────
 

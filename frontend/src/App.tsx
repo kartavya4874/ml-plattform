@@ -32,6 +32,10 @@ import NotFoundPage from './pages/NotFoundPage'
 import LandingPage from './pages/LandingPage'
 import OrganizationManagementPage from './pages/OrganizationManagementPage'
 import DocumentationPage from './pages/DocumentationPage'
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
+import TermsOfServicePage from './pages/TermsOfServicePage'
+import RefundPolicyPage from './pages/RefundPolicyPage'
+import ContactUsPage from './pages/ContactUsPage'
 import CommandPalette from './components/CommandPalette'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 
@@ -67,6 +71,10 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
+      <Route path="/terms" element={<TermsOfServicePage />} />
+      <Route path="/refund-policy" element={<RefundPolicyPage />} />
+      <Route path="/contact" element={<ContactUsPage />} />
 
       {/* Protected routes — auth guard first, then layout shell */}
       <Route element={<RequireAuth />}>

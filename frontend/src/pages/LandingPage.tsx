@@ -458,18 +458,103 @@ export default function LandingPage() {
             </Box>
 
             {/* Footer */}
-            <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, py: 6, px: 3 }}>
+            <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, py: 8, px: 3 }}>
                 <Container maxWidth="xl">
-                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: 'center', gap: 3 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <Box sx={{ width: 28, height: 28, borderRadius: '8px', background: isDark ? '#FAFAFA' : '#18181B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <LogoIcon sx={{ color: isDark ? '#09090B' : '#FFFFFF', fontSize: 14 }} />
+                    <Grid container spacing={6} sx={{ mb: 6 }}>
+                        {/* Brand */}
+                        <Grid size={{ xs: 12, md: 4 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                                <Box sx={{ width: 28, height: 28, borderRadius: '8px', background: isDark ? '#FAFAFA' : '#18181B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <LogoIcon sx={{ color: isDark ? '#09090B' : '#FFFFFF', fontSize: 14 }} />
+                                </Box>
+                                <Typography variant="body1" fontWeight={800} letterSpacing="-0.5px">Parametrix AI</Typography>
                             </Box>
-                            <Typography variant="body1" fontWeight={800} letterSpacing="-0.5px">Parametrix AI</Typography>
-                        </Box>
+                            <Typography variant="body2" sx={{ color: theme.palette.text.secondary, maxWidth: 320, lineHeight: 1.7 }}>
+                                A unified hybrid workspace to explore data, auto-train robust models, and deploy production APIs.
+                            </Typography>
+                        </Grid>
+
+                        {/* Product Links */}
+                        <Grid size={{ xs: 6, sm: 4, md: 2 }}>
+                            <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', mb: 2, display: 'block' }}>
+                                Product
+                            </Typography>
+                            {[
+                                { label: 'Pricing', path: '/login' },
+                                { label: 'Documentation', path: '/login' },
+                                { label: 'API Reference', path: '/login' },
+                            ].map((link) => (
+                                <Typography key={link.label} variant="body2" sx={{
+                                    color: theme.palette.text.secondary, mb: 1.5, cursor: 'pointer',
+                                    '&:hover': { color: theme.palette.text.primary },
+                                    transition: 'color 0.2s',
+                                }} onClick={() => navigate(link.path)}>
+                                    {link.label}
+                                </Typography>
+                            ))}
+                        </Grid>
+
+                        {/* Legal Links */}
+                        <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                            <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', mb: 2, display: 'block' }}>
+                                Legal
+                            </Typography>
+                            {[
+                                { label: 'Privacy Policy', path: '/privacy' },
+                                { label: 'Terms of Service', path: '/terms' },
+                                { label: 'Refund Policy', path: '/refund-policy' },
+                            ].map((link) => (
+                                <Typography key={link.label} variant="body2" sx={{
+                                    color: theme.palette.text.secondary, mb: 1.5, cursor: 'pointer',
+                                    '&:hover': { color: theme.palette.text.primary },
+                                    transition: 'color 0.2s',
+                                }} onClick={() => navigate(link.path)}>
+                                    {link.label}
+                                </Typography>
+                            ))}
+                        </Grid>
+
+                        {/* Support Links */}
+                        <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                            <Typography variant="caption" sx={{ color: theme.palette.text.secondary, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', mb: 2, display: 'block' }}>
+                                Support
+                            </Typography>
+                            {[
+                                { label: 'Contact Us', path: '/contact' },
+                                { label: 'Help Center', path: '/login' },
+                            ].map((link) => (
+                                <Typography key={link.label} variant="body2" sx={{
+                                    color: theme.palette.text.secondary, mb: 1.5, cursor: 'pointer',
+                                    '&:hover': { color: theme.palette.text.primary },
+                                    transition: 'color 0.2s',
+                                }} onClick={() => navigate(link.path)}>
+                                    {link.label}
+                                </Typography>
+                            ))}
+                        </Grid>
+                    </Grid>
+
+                    {/* Bottom Bar */}
+                    <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, pt: 4, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
                         <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
                             © {new Date().getFullYear()} Parametrix AI. All rights reserved. Made with ❤️ by Kartavya.
                         </Typography>
+                        <Box sx={{ display: 'flex', gap: 3 }}>
+                            {[
+                                { label: 'Privacy', path: '/privacy' },
+                                { label: 'Terms', path: '/terms' },
+                                { label: 'Refunds', path: '/refund-policy' },
+                                { label: 'Contact', path: '/contact' },
+                            ].map((link) => (
+                                <Typography key={link.label} variant="body2" sx={{
+                                    color: theme.palette.text.secondary, cursor: 'pointer', fontWeight: 500,
+                                    '&:hover': { color: theme.palette.text.primary },
+                                    transition: 'color 0.2s',
+                                }} onClick={() => navigate(link.path)}>
+                                    {link.label}
+                                </Typography>
+                            ))}
+                        </Box>
                     </Box>
                 </Container>
             </Box>

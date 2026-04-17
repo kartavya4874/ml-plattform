@@ -17,7 +17,7 @@ async def init_db():
         Notebook,
         Competition, Submission,
         Organization, OrgMembership,
-        Notification,
+        Notification, ContactMessage,
     )
     import structlog
     import asyncio
@@ -37,7 +37,7 @@ async def init_db():
         Notebook,
         Competition, Submission,
         Organization, OrgMembership,
-        Notification,
+        Notification, ContactMessage,
     ]
 
     try:
