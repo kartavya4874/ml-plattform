@@ -45,7 +45,7 @@ class ChatRequest(BaseModel):
     history: List[ChatMessage]
     message: str
 
-@router.post("")
+@router.post("/")
 async def chat_with_gemini(req: ChatRequest):
     """
     Interact with the Gemini model using persistent memory history.

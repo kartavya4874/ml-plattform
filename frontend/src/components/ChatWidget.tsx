@@ -67,7 +67,7 @@ export default function ChatWidget() {
         setIsLoading(true)
 
         try {
-            const { data } = await api.post('/chat', {
+            const { data } = await api.post('/chat/', {
                 history: snapshotParams,
                 message: userMsg.parts[0]
             })
