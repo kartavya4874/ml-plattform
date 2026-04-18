@@ -11,13 +11,14 @@ async def init_db():
     from app.models.models import (
         User, Dataset, TrainingJob, MLModel, 
         Deployment, APIKey, InferenceLog, AuditLog,
-        Subscription, UsageRecord, Invoice,
+        Subscription, UsageRecord, UsageMeteredEvent, Invoice,
         Discussion, Comment, Vote,
         Star, Follow, Fork, Activity,
         Notebook,
         Competition, Submission,
-        Organization, OrgMembership,
+        Organization, OrgMembership, OrgInvite,
         Notification, ContactMessage,
+        UserBadge,
     )
     import structlog
     import asyncio
@@ -31,13 +32,14 @@ async def init_db():
     document_models = [
         User, Dataset, TrainingJob, MLModel,
         Deployment, APIKey, InferenceLog, AuditLog,
-        Subscription, UsageRecord, Invoice,
+        Subscription, UsageRecord, UsageMeteredEvent, Invoice,
         Discussion, Comment, Vote,
         Star, Follow, Fork, Activity,
         Notebook,
         Competition, Submission,
-        Organization, OrgMembership,
+        Organization, OrgMembership, OrgInvite,
         Notification, ContactMessage,
+        UserBadge,
     ]
 
     try:

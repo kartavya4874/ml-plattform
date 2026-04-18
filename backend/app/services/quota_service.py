@@ -6,7 +6,8 @@ from typing import Optional
 from fastapi import HTTPException
 
 from app.models.models import (
-    Subscription, UsageRecord, SubscriptionTier, SubscriptionStatus, User
+    Subscription, UsageRecord, UsageMeteredEvent,
+    SubscriptionTier, SubscriptionStatus, User
 )
 
 
@@ -21,6 +22,7 @@ TIER_LIMITS = {
         "deployments": 3,
         "inference_requests_per_month": 5_000,
         "api_keys_per_model": 2,
+        "gpu_enabled": False,
     },
     SubscriptionTier.pro: {
         "datasets": 25,
@@ -30,6 +32,17 @@ TIER_LIMITS = {
         "deployments": 10,
         "inference_requests_per_month": 50_000,
         "api_keys_per_model": 5,
+        "gpu_enabled": True,
+    },
+    SubscriptionTier.payg: {
+        "datasets": 100,
+        "max_file_size_bytes": 50 * 1024 * 1024 * 1024,  # 50 GB
+        "training_jobs_per_month": 999_999,
+        "models": 100,
+        "deployments": 50,
+        "inference_requests_per_month": 999_999,
+        "api_keys_per_model": 20,
+        "gpu_enabled": True,
     },
     SubscriptionTier.enterprise: {
         "datasets": 999_999,
@@ -39,8 +52,30 @@ TIER_LIMITS = {
         "deployments": 999_999,
         "inference_requests_per_month": 999_999,
         "api_keys_per_model": 999_999,
+        "gpu_enabled": True,
     },
 }
+
+# ── GPU Pricing (per hour in ₹) ──────────────────────────────────────────────
+
+GPU_PRICING = {
+    "T4": {"per_hour": 50.0, "description": "NVIDIA T4 — 16GB VRAM, great for inference & light training"},
+    "A10G": {"per_hour": 90.0, "description": "NVIDIA A10G — 24GB VRAM, ideal for medium training"},
+    "A100": {"per_hour": 200.0, "description": "NVIDIA A100 — 80GB VRAM, maximum performance"},
+}
+
+# ── PAYG Unit Pricing (in ₹) ────────────────────────────────────────────────
+
+PAYG_UNIT_PRICING = {
+    "gpu_minute_T4": 50.0 / 60,      # ₹0.83/min
+    "gpu_minute_A10G": 90.0 / 60,     # ₹1.50/min
+    "gpu_minute_A100": 200.0 / 60,    # ₹3.33/min
+    "cpu_minute": 0.10,                # ₹0.10/min
+    "storage_gb_month": 2.0,           # ₹2/GB/month
+    "api_call": 0.001,                 # ₹0.001/request
+    "training_job": 5.0,               # ₹5/job base
+}
+
 
 PRICING_INFO = [
     {
@@ -87,15 +122,41 @@ PRICING_INFO = [
         "features": [
             "25 datasets (up to 2 GB each)",
             "50 training jobs per month",
-            "20 models",
-            "10 deployments",
+            "20 models & 10 deployments",
             "50,000 inference requests/month",
+            "GPU Training (T4 included)",
             "Priority support",
             "SHAP & explainability lab",
-            "Batch inference",
             "Model export (ONNX / Docker)",
         ],
         "is_popular": True,
+    },
+    {
+        "tier": "payg",
+        "name": "Pay As You Go",
+        "price_monthly": 499,
+        "price_label": "₹499 base + usage",
+        "description": "Pay only for what you use. Perfect for variable workloads.",
+        "limits": {
+            "datasets": 100,
+            "max_file_size_mb": 51200,
+            "training_jobs_per_month": 999_999,
+            "models": 100,
+            "deployments": 50,
+            "inference_requests_per_month": 999_999,
+            "api_keys_per_model": 20,
+        },
+        "features": [
+            "₹499/mo base + usage-based billing",
+            "GPU: ₹50/hr (T4) · ₹90/hr (A10G) · ₹200/hr (A100)",
+            "Up to 100 datasets (50 GB each)",
+            "Unlimited training jobs",
+            "100 models & 50 deployments",
+            "Storage: ₹2/GB/month",
+            "API calls: ₹0.001/request",
+            "Priority support",
+        ],
+        "is_popular": False,
     },
     {
         "tier": "enterprise",
@@ -113,14 +174,14 @@ PRICING_INFO = [
             "api_keys_per_model": 999_999,
         },
         "features": [
-            "Unlimited datasets (up to 50 GB each)",
-            "Unlimited training jobs",
-            "Unlimited models",
-            "Unlimited deployments",
-            "Unlimited inference requests",
+            "Unlimited everything",
+            "All GPU types included",
+            "Organization management",
+            "Email domain restrictions",
+            "White-labeling & custom branding",
+            "Custom domain routing",
             "Dedicated support & SLA",
             "SSO & team management",
-            "Custom model hosting",
             "Audit logs & compliance",
         ],
         "is_popular": False,
@@ -235,6 +296,13 @@ async def check_quota(user_id: uuid.UUID, resource_type: str, amount: int = 1):
         )
 
 
+async def check_gpu_access(user_id: uuid.UUID) -> bool:
+    """Check if user's tier allows GPU access."""
+    tier = await get_user_tier(user_id)
+    limits = get_tier_limits(tier)
+    return limits.get("gpu_enabled", False)
+
+
 async def increment_usage(user_id: uuid.UUID, resource_type: str, amount: int = 1):
     """Atomically increment a usage counter for the current billing period."""
     usage = await get_or_create_usage(user_id)
@@ -243,6 +311,64 @@ async def increment_usage(user_id: uuid.UUID, resource_type: str, amount: int = 
     setattr(usage, usage_field, current + amount)
     usage.updated_at = datetime.now(timezone.utc)
     await usage.save()
+
+
+async def record_metered_usage(
+    user_id: uuid.UUID,
+    event_type: str,
+    quantity: float,
+    metadata: dict = None,
+) -> UsageMeteredEvent:
+    """Record a metered usage event for PAYG billing."""
+    unit_price = PAYG_UNIT_PRICING.get(event_type, 0.0)
+    total_cost = quantity * unit_price
+
+    event = UsageMeteredEvent(
+        user_id=user_id,
+        event_type=event_type,
+        quantity=quantity,
+        unit_price=unit_price,
+        total_cost=total_cost,
+        event_metadata=metadata or {},
+    )
+    await event.insert()
+
+    # Also update GPU minutes if applicable
+    if event_type.startswith("gpu_minute"):
+        usage = await get_or_create_usage(user_id)
+        usage.gpu_minutes_used += quantity
+        usage.updated_at = datetime.now(timezone.utc)
+        await usage.save()
+
+    return event
+
+
+async def get_metered_usage_summary(user_id: uuid.UUID) -> dict:
+    """Get metered usage breakdown for the current billing period."""
+    period_start, period_end = _current_period_bounds()
+    events = await UsageMeteredEvent.find(
+        UsageMeteredEvent.user_id == user_id,
+        UsageMeteredEvent.created_at >= period_start,
+        UsageMeteredEvent.created_at < period_end,
+    ).to_list()
+
+    breakdown = {}
+    total_cost = 0.0
+    for e in events:
+        if e.event_type not in breakdown:
+            breakdown[e.event_type] = {"quantity": 0.0, "total_cost": 0.0}
+        breakdown[e.event_type]["quantity"] += e.quantity
+        breakdown[e.event_type]["total_cost"] += e.total_cost
+        total_cost += e.total_cost
+
+    return {
+        "period_start": period_start.isoformat(),
+        "period_end": period_end.isoformat(),
+        "breakdown": breakdown,
+        "total_cost": round(total_cost, 2),
+        "base_fee": 499.0,  # PAYG base fee
+        "estimated_bill": round(499.0 + total_cost, 2),
+    }
 
 
 async def get_usage_summary(user_id: uuid.UUID) -> dict:
@@ -259,6 +385,7 @@ async def get_usage_summary(user_id: uuid.UUID) -> dict:
             "deployments_active": usage.deployments_active,
             "inference_requests": usage.inference_requests,
             "storage_bytes_used": usage.storage_bytes_used,
+            "gpu_minutes_used": usage.gpu_minutes_used,
         },
         "limits": {
             "datasets": limits["datasets"],
@@ -268,5 +395,6 @@ async def get_usage_summary(user_id: uuid.UUID) -> dict:
             "deployments": limits["deployments"],
             "inference_requests_per_month": limits["inference_requests_per_month"],
             "api_keys_per_model": limits["api_keys_per_model"],
+            "gpu_enabled": limits.get("gpu_enabled", False),
         },
     }

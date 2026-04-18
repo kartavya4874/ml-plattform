@@ -444,6 +444,38 @@ async def import_dataset(notebook_id: uuid.UUID, dataset_id: uuid.UUID, current_
     return {"message": f"Dataset '{filename}' imported to notebook workspace", "filename": filename, "size_bytes": len(data)}
 
 
+@router.post("/{notebook_id}/import-model/{model_id}")
+async def import_model(notebook_id: uuid.UUID, model_id: uuid.UUID, current_user: User = Depends(get_current_user)):
+    """Copy/link a model artifact file into the notebook workspace."""
+    from app.models.models import MLModel
+    nb = await Notebook.get(notebook_id)
+    if not nb:
+        raise HTTPException(404, "Notebook not found")
+    if nb.owner_id != current_user.id:
+        raise HTTPException(403, "Not authorized")
+
+    model = await MLModel.get(model_id)
+    if not model:
+        raise HTTPException(404, "Model not found")
+    if model.owner_id != current_user.id and not model.is_public:
+        raise HTTPException(403, "Not authorized to access this model")
+
+    from app.services.storage_service import StorageService
+    storage = await StorageService.get_instance()
+    try:
+        data = await storage.download_bytes(settings.R2_BUCKET_MODELS, model.artifact_path)
+    except Exception:
+        raise HTTPException(500, "Failed to download model artifact from storage")
+
+    ws = _get_workspace(notebook_id)
+    # Give it a safe name
+    filename = model.artifact_path.split("/")[-1] if "/" in model.artifact_path else "model.pkl"
+    (ws / filename).write_bytes(data)
+
+    return {"message": f"Model artifact '{filename}' imported to notebook workspace", "filename": filename, "size_bytes": len(data)}
+
+
+
 @router.post("/{notebook_id}/upload-file")
 async def upload_file_to_notebook(
     notebook_id: uuid.UUID,

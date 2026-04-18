@@ -1,20 +1,23 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import {
     Box, Typography, Button, TextField, IconButton, Chip, Switch, FormControlLabel,
     Card, Drawer, Divider, List, ListItem, ListItemText, ListItemIcon, Dialog,
-    DialogTitle, DialogContent, DialogActions, CircularProgress, Alert
+    DialogTitle, DialogContent, DialogActions, CircularProgress, Alert, Tooltip
 } from '@mui/material'
 import {
     PlayArrow as RunIcon, Add as AddIcon, Delete as DeleteIcon, Save as SaveIcon,
     Terminal as PkgIcon, InsertDriveFile as FileIcon, CloudUpload as UploadIcon,
     Storage as DataIcon, Close as CloseIcon, Download as DownloadIcon,
-    UploadFile as ImportIcon
+    UploadFile as ImportIcon, AutoAwesome as AIIcon, Memory as GpuIcon,
 } from '@mui/icons-material'
 import { api } from '../api/client'
+import CodeMirrorCell from '../components/CodeMirrorCell'
+import NotebookAIPanel from '../components/NotebookAIPanel'
 
 interface Cell { type: 'code' | 'markdown'; source: string; outputs: any[] }
-interface NotebookData { id: string; title: string; description: string | null; is_public: boolean; cells: Cell[]; tags: string[] }
+interface RuntimeConfig { gpu_enabled: boolean; gpu_type?: string }
+interface NotebookData { id: string; title: string; description: string | null; is_public: boolean; cells: Cell[]; tags: string[]; runtime_config?: RuntimeConfig }
 interface NbFile { filename: string; size_bytes: number }
 
 const SIDEBAR_WIDTH = 260
@@ -31,6 +34,10 @@ export default function NotebookEditor() {
     const [saving, setSaving] = useState(false)
     const [running, setRunning] = useState<number | null>(null)
     const [exportError, setExportError] = useState<string | null>(null)
+    const [focusedCell, setFocusedCell] = useState<number>(0)
+
+    // AI Panel
+    const [aiPanelOpen, setAiPanelOpen] = useState(false)
 
     // File manager
     const [files, setFiles] = useState<NbFile[]>([])
@@ -45,9 +52,12 @@ export default function NotebookEditor() {
     const [pkgInstalling, setPkgInstalling] = useState(false)
     const [pkgResult, setPkgResult] = useState<string | null>(null)
 
-    // Dataset import
-    const [dsDialog, setDsDialog] = useState(false)
+    // Import Dialog
+    const [importDialog, setImportDialog] = useState(false)
+    const [importTab, setImportTab] = useState(0)
     const [datasets, setDatasets] = useState<any[]>([])
+    const [publicDatasets, setPublicDatasets] = useState<any[]>([])
+    const [publicModels, setPublicModels] = useState<any[]>([])
     const [importing, setImporting] = useState<string | null>(null)
 
     // ipynb import
@@ -69,6 +79,11 @@ export default function NotebookEditor() {
                 e.preventDefault()
                 if (activeFile) saveFile()
                 else saveNotebook()
+            }
+            // Ctrl+I to toggle AI panel
+            if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+                e.preventDefault()
+                setAiPanelOpen(prev => !prev)
             }
         }
         window.addEventListener('keydown', handleGlobalKeyDown)
@@ -122,7 +137,7 @@ export default function NotebookEditor() {
         if (!notebook) return
         setSaving(true)
         try {
-            await api.put(`/notebooks/${notebook.id}`, { title: notebook.title, cells: notebook.cells, is_public: notebook.is_public, tags: notebook.tags })
+            await api.put(`/notebooks/${notebook.id}`, { title: notebook.title, cells: notebook.cells, is_public: notebook.is_public, tags: notebook.tags, runtime_config: notebook.runtime_config })
         } catch (e) { console.error(e) }
         setSaving(false)
     }
@@ -141,6 +156,17 @@ export default function NotebookEditor() {
             })
         } catch (e) { console.error(e) }
         setRunning(null)
+    }
+
+    const runAndAdvance = async (index: number) => {
+        await runCell(index)
+        if (notebook && index === notebook.cells.length - 1) {
+            addCell('code')
+        }
+        setTimeout(() => {
+            const nextEl = document.querySelector(`[data-cell-index="${index + 1}"]`)
+            if (nextEl) (nextEl as HTMLElement).focus()
+        }, 100)
     }
 
     const exportToIpynb = async () => {
@@ -281,14 +307,23 @@ export default function NotebookEditor() {
         setPkgInstalling(false)
     }
 
-    // ── Dataset import ──────────────────────────────────────────────────────
+    // ── Dataset/Model import ────────────────────────────────────────────────
 
-    const openDatasetDialog = async () => {
-        setDsDialog(true)
+    const openImportDialog = async () => {
+        setImportDialog(true)
         try {
-            const res = await api.get('/data/datasets')
-            setDatasets(res.data)
-        } catch { setDatasets([]) }
+            const [dsRes, comRes] = await Promise.all([
+                api.get('/data/datasets'),
+                api.get('/community/search')
+            ])
+            setDatasets(dsRes.data)
+            setPublicDatasets(comRes.data.datasets || [])
+            setPublicModels(comRes.data.models || [])
+        } catch {
+            setDatasets([])
+            setPublicDatasets([])
+            setPublicModels([])
+        }
     }
 
     const importDataset = async (dsId: string) => {
@@ -297,9 +332,29 @@ export default function NotebookEditor() {
         try {
             await api.post(`/notebooks/${id}/import-dataset/${dsId}`)
             loadFiles()
-            setDsDialog(false)
-        } catch (e) { console.error(e) }
+            setImportDialog(false)
+        } catch (e: any) { alert(e.response?.data?.detail || 'Import failed') }
         setImporting(null)
+    }
+
+    const importModel = async (modelId: string) => {
+        if (!id) return
+        setImporting(modelId)
+        try {
+            await api.post(`/notebooks/${id}/import-model/${modelId}`)
+            loadFiles()
+            setImportDialog(false)
+        } catch (e: any) { alert(e.response?.data?.detail || 'Import failed') }
+        setImporting(null)
+    }
+
+    // ── AI Insert Code handler ──────────────────────────────────────────────
+
+    const handleInsertCode = (code: string) => {
+        if (!notebook) return
+        const idx = focusedCell
+        const currentSource = notebook.cells[idx]?.source || ''
+        updateCell(idx, currentSource ? currentSource + '\n' + code : code)
     }
 
     if (!notebook) return <Typography>Loading...</Typography>
@@ -344,7 +399,7 @@ export default function NotebookEditor() {
                         <Button size="small" variant="outlined" startIcon={<UploadIcon sx={{ fontSize: 14 }} />} component="label" sx={{ fontSize: 10, flex: 1 }}>
                             Upload <input type="file" hidden onChange={uploadFile} />
                         </Button>
-                        <Button size="small" variant="outlined" startIcon={<DataIcon sx={{ fontSize: 14 }} />} onClick={openDatasetDialog} sx={{ fontSize: 10, flex: 1 }}>
+                        <Button size="small" variant="outlined" startIcon={<DataIcon sx={{ fontSize: 14 }} />} onClick={openImportDialog} sx={{ fontSize: 10, flex: 1 }}>
                             Import
                         </Button>
                     </Box>
@@ -366,11 +421,58 @@ export default function NotebookEditor() {
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexShrink: 0 }}>
                         <FormControlLabel control={<Switch size="small" checked={notebook.is_public} onChange={e => setNotebook({ ...notebook, is_public: e.target.checked })} />}
                             label={<Typography variant="caption">Public</Typography>} />
+                        <Tooltip title="AI Code Assistant (Ctrl+I)">
+                            <Button
+                                variant={aiPanelOpen ? "contained" : "outlined"}
+                                size="small"
+                                startIcon={<AIIcon />}
+                                onClick={() => setAiPanelOpen(!aiPanelOpen)}
+                                sx={{
+                                    borderColor: '#6366F140',
+                                    color: aiPanelOpen ? '#fff' : '#818CF8',
+                                    background: aiPanelOpen ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'transparent',
+                                    '&:hover': { background: aiPanelOpen ? 'linear-gradient(135deg, #5558E6, #7C4FE0)' : '#6366F110' },
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                }}
+                            >
+                                AI Assist
+                            </Button>
+                        </Tooltip>
                         <Button variant="outlined" size="small" startIcon={<ImportIcon />} component="label"
                             disabled={ipynbImporting}>
                             {ipynbImporting ? 'Importing...' : '.ipynb'}
                             <input type="file" accept=".ipynb" hidden onChange={handleImportIpynb} ref={ipynbInputRef} />
                         </Button>
+                        <Box sx={{ display: 'flex', alignItems: 'center', backgroundColor: '#1E1E1E', borderRadius: 1, p: 0.5 }}>
+                            <Tooltip title="Toggle GPU">
+                                <IconButton
+                                    size="small"
+                                    onClick={() => {
+                                        setNotebook({
+                                            ...notebook,
+                                            runtime_config: {
+                                                gpu_enabled: !notebook.runtime_config?.gpu_enabled,
+                                                gpu_type: notebook.runtime_config?.gpu_type || 'T4'
+                                            }
+                                        })
+                                    }}
+                                    sx={{ color: notebook.runtime_config?.gpu_enabled ? '#10B981' : 'text.secondary' }}
+                                >
+                                    <GpuIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                            {notebook.runtime_config?.gpu_enabled && (
+                                <Box component="select"
+                                    value={notebook.runtime_config.gpu_type || 'T4'}
+                                    onChange={(e) => setNotebook({ ...notebook, runtime_config: { ...notebook.runtime_config, gpu_enabled: true, gpu_type: e.target.value } })}
+                                    style={{ background: 'transparent', color: '#10B981', border: 'none', outline: 'none', fontSize: 11, fontWeight: 'bold' }}
+                                >
+                                    <option value="T4">T4</option>
+                                    <option value="A100">A100</option>
+                                </Box>
+                            )}
+                        </Box>
                         <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={exportToIpynb}>
                             Export
                         </Button>
@@ -412,42 +514,91 @@ export default function NotebookEditor() {
                         /* Notebook cells */
                         <>
                             {notebook.cells.map((cell, i) => (
-                                <Card key={i} sx={{ mb: 2, border: running === i ? '1px solid #6366F1' : '1px solid #222', transition: 'border-color 0.2s' }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 0.5, borderBottom: '1px solid #1a1a1a', background: '#0D0D0D' }}>
-                                        <Chip size="small" label={cell.type === 'code' ? 'Python' : 'Markdown'} sx={{ fontSize: 10 }} />
-                                        <Box>
+                                <Card
+                                    key={i}
+                                    data-cell-index={i}
+                                    onClick={() => setFocusedCell(i)}
+                                    sx={{
+                                        mb: 2,
+                                        border: running === i
+                                            ? '1px solid #6366F1'
+                                            : focusedCell === i
+                                                ? '1px solid #6366F180'
+                                                : '1px solid #222',
+                                        transition: 'border-color 0.2s',
+                                        overflow: 'hidden',
+                                    }}
+                                >
+                                    {/* Cell toolbar */}
+                                    <Box sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        px: 2, py: 0.5,
+                                        borderBottom: '1px solid #1a1a1a',
+                                        background: '#0D0D0D'
+                                    }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <Chip size="small" label={cell.type === 'code' ? 'Python' : 'Markdown'} sx={{ fontSize: 10 }} />
                                             {cell.type === 'code' && (
-                                                <IconButton size="small" onClick={() => runCell(i)} disabled={running !== null} sx={{ color: '#10B981' }}>
-                                                    <RunIcon fontSize="small" />
-                                                </IconButton>
+                                                <Typography variant="caption" sx={{ color: '#555', fontSize: 10 }}>
+                                                    [{i + 1}]
+                                                </Typography>
+                                            )}
+                                        </Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                            {cell.type === 'code' && (
+                                                <>
+                                                    <Tooltip title="AI Assist (Ctrl+I)">
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={(e) => { e.stopPropagation(); setFocusedCell(i); setAiPanelOpen(true) }}
+                                                            sx={{ color: '#818CF8' }}
+                                                        >
+                                                            <AIIcon sx={{ fontSize: 16 }} />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="Run Cell (Ctrl+Enter)">
+                                                        <IconButton size="small" onClick={() => runCell(i)} disabled={running !== null} sx={{ color: '#10B981' }}>
+                                                            <RunIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </>
                                             )}
                                             <IconButton size="small" onClick={() => deleteCell(i)} sx={{ color: 'text.secondary' }}>
                                                 <DeleteIcon fontSize="small" />
                                             </IconButton>
                                         </Box>
                                     </Box>
-                                    <TextField fullWidth multiline minRows={3} maxRows={20} value={cell.source}
-                                        id={`cell-input-${i}`}
-                                        onChange={e => updateCell(i, e.target.value)}
-                                        onKeyDown={e => {
-                                            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                                                e.preventDefault()
-                                                if (cell.type === 'code') runCell(i)
-                                            } else if (e.shiftKey && e.key === 'Enter') {
-                                                e.preventDefault()
-                                                if (cell.type === 'code') runCell(i)
-                                                if (i === notebook.cells.length - 1) {
-                                                    addCell('code')
-                                                    setTimeout(() => document.getElementById(`cell-input-${i + 1}`)?.focus(), 50)
-                                                } else {
-                                                    setTimeout(() => document.getElementById(`cell-input-${i + 1}`)?.focus(), 50)
-                                                }
-                                            }
-                                        }}
-                                        sx={{
-                                            '& .MuiOutlinedInput-root': { borderRadius: 0, fontFamily: '"JetBrains Mono", "Fira Code", monospace', fontSize: 13, background: '#050505' },
-                                            '& fieldset': { border: 'none' },
-                                        }} />
+
+                                    {/* Cell editor */}
+                                    {cell.type === 'code' ? (
+                                        <CodeMirrorCell
+                                            value={cell.source}
+                                            onChange={(val) => updateCell(i, val)}
+                                            onRun={() => runCell(i)}
+                                            onRunAndAdvance={() => runAndAdvance(i)}
+                                            readOnly={running === i}
+                                        />
+                                    ) : (
+                                        <TextField
+                                            fullWidth multiline minRows={2} maxRows={20}
+                                            value={cell.source}
+                                            onChange={e => updateCell(i, e.target.value)}
+                                            placeholder="## Write markdown here..."
+                                            sx={{
+                                                '& .MuiOutlinedInput-root': {
+                                                    borderRadius: 0,
+                                                    fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+                                                    fontSize: 13,
+                                                    background: '#050505'
+                                                },
+                                                '& fieldset': { border: 'none' },
+                                            }}
+                                        />
+                                    )}
+
+                                    {/* Cell outputs */}
                                     {cell.outputs.length > 0 && (
                                         <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid #1a1a1a', background: '#080808', fontFamily: 'monospace', fontSize: 12 }}>
                                             {cell.outputs.map((out: any, j: number) => (
@@ -457,8 +608,18 @@ export default function NotebookEditor() {
                                             ))}
                                         </Box>
                                     )}
+
+                                    {/* Running indicator */}
+                                    {running === i && (
+                                        <Box sx={{ px: 2, py: 1, borderTop: '1px solid #1a1a1a', background: '#080808', display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <CircularProgress size={14} sx={{ color: '#6366F1' }} />
+                                            <Typography variant="caption" color="text.secondary">Executing...</Typography>
+                                        </Box>
+                                    )}
                                 </Card>
                             ))}
+
+                            {/* Add cell buttons */}
                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mt: 2 }}>
                                 <Button size="small" variant="outlined" onClick={() => addCell('code')}>+ Code Cell</Button>
                                 <Button size="small" variant="outlined" onClick={() => addCell('markdown')}>+ Markdown Cell</Button>
@@ -467,6 +628,20 @@ export default function NotebookEditor() {
                     )}
                 </Box>
             </Box>
+
+            {/* AI Assistant Panel */}
+            {aiPanelOpen && (
+                <Box sx={{ width: 400, flexShrink: 0, borderLeft: '1px solid #1a1a1a', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: '#0a0a0a' }}>
+                    <NotebookAIPanel
+                        open={aiPanelOpen}
+                        onClose={() => setAiPanelOpen(false)}
+                        currentCellSource={notebook.cells[focusedCell]?.source || ''}
+                        allCells={notebook.cells}
+                        currentCellIndex={focusedCell}
+                        onInsertCode={handleInsertCode}
+                    />
+                </Box>
+            )}
 
             {/* Package Install Dialog */}
             <Dialog open={pkgDialog} onClose={() => setPkgDialog(false)} maxWidth="sm" fullWidth>
@@ -488,30 +663,94 @@ export default function NotebookEditor() {
                 </DialogActions>
             </Dialog>
 
-            {/* Dataset Import Dialog */}
-            <Dialog open={dsDialog} onClose={() => setDsDialog(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>Import Dataset to Notebook</DialogTitle>
+            {/* Resource Import Dialog */}
+            <Dialog open={importDialog} onClose={() => setImportDialog(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>Import Data or Models</DialogTitle>
                 <DialogContent>
-                    <Typography variant="body2" color="text.secondary" mb={2}>
-                        Select a dataset to copy into this notebook's workspace. You can then load it with <code>pd.read_csv("filename.csv")</code>.
-                    </Typography>
-                    <List dense>
-                        {datasets.map(ds => (
-                            <ListItem key={ds.id} sx={{ border: '1px solid #222', borderRadius: 1, mb: 1 }}
-                                secondaryAction={
-                                    <Button size="small" variant="outlined" onClick={() => importDataset(ds.id)}
-                                        disabled={importing === ds.id} startIcon={importing === ds.id ? <CircularProgress size={14} /> : <DownloadIcon />}>
-                                        Import
-                                    </Button>
-                                }>
-                                <ListItemIcon><DataIcon sx={{ color: 'primary.main' }} /></ListItemIcon>
-                                <ListItemText primary={ds.name} secondary={`${ds.dataset_type} • ${(ds.file_size_bytes / 1024).toFixed(0)} KB`} />
-                            </ListItem>
+                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                        {['My Datasets', 'Public Datasets', 'Public Models'].map((tab, idx) => (
+                            <Button
+                                key={tab}
+                                size="small"
+                                variant={importTab === idx ? "contained" : "text"}
+                                onClick={() => setImportTab(idx)}
+                                sx={{ borderRadius: 8, fontSize: 12, textTransform: 'none' }}
+                            >
+                                {tab}
+                            </Button>
                         ))}
-                        {datasets.length === 0 && <Typography color="text.secondary">No datasets found. Upload one first.</Typography>}
-                    </List>
+                    </Box>
+
+                    {importTab === 0 && (
+                        <>
+                            <Typography variant="body2" color="text.secondary" mb={2}>
+                                Select a dataset to copy into this notebook's workspace.
+                            </Typography>
+                            <List dense>
+                                {datasets.map(ds => (
+                                    <ListItem key={ds.id} sx={{ border: '1px solid #222', borderRadius: 1, mb: 1 }}
+                                        secondaryAction={
+                                            <Button size="small" variant="outlined" onClick={() => importDataset(ds.id)}
+                                                disabled={importing === ds.id} startIcon={importing === ds.id ? <CircularProgress size={14} /> : <DownloadIcon />}>
+                                                Import
+                                            </Button>
+                                        }>
+                                        <ListItemIcon><DataIcon sx={{ color: 'primary.main' }} /></ListItemIcon>
+                                        <ListItemText primary={ds.name} secondary={`${ds.dataset_type} • ${(ds.file_size_bytes / 1024).toFixed(0)} KB`} />
+                                    </ListItem>
+                                ))}
+                                {datasets.length === 0 && <Typography color="text.secondary">No datasets found. Upload one first.</Typography>}
+                            </List>
+                        </>
+                    )}
+
+                    {importTab === 1 && (
+                        <>
+                            <Typography variant="body2" color="text.secondary" mb={2}>
+                                Select a public dataset from the community hub.
+                            </Typography>
+                            <List dense>
+                                {publicDatasets.map(ds => (
+                                    <ListItem key={ds.id} sx={{ border: '1px solid #222', borderRadius: 1, mb: 1 }}
+                                        secondaryAction={
+                                            <Button size="small" variant="outlined" onClick={() => importDataset(ds.id)}
+                                                disabled={importing === ds.id} startIcon={importing === ds.id ? <CircularProgress size={14} /> : <DownloadIcon />}>
+                                                Import
+                                            </Button>
+                                        }>
+                                        <ListItemIcon><DataIcon sx={{ color: '#10B981' }} /></ListItemIcon>
+                                        <ListItemText primary={ds.name} secondary={`${ds.dataset_type} • Community Dataset`} />
+                                    </ListItem>
+                                ))}
+                                {publicDatasets.length === 0 && <Typography color="text.secondary">No datasets found.</Typography>}
+                            </List>
+                        </>
+                    )}
+
+                    {importTab === 2 && (
+                        <>
+                            <Typography variant="body2" color="text.secondary" mb={2}>
+                                Select a pre-trained model artifact to use in this notebook.
+                            </Typography>
+                            <List dense>
+                                {publicModels.map(model => (
+                                    <ListItem key={model.id} sx={{ border: '1px solid #222', borderRadius: 1, mb: 1 }}
+                                        secondaryAction={
+                                            <Button size="small" variant="outlined" onClick={() => importModel(model.id)}
+                                                disabled={importing === model.id} startIcon={importing === model.id ? <CircularProgress size={14} /> : <DownloadIcon />}>
+                                                Import
+                                            </Button>
+                                        }>
+                                        <ListItemIcon><ImportIcon sx={{ color: '#8B5CF6' }} /></ListItemIcon>
+                                        <ListItemText primary={model.name} secondary={`${model.task_type} • ${model.framework}`} />
+                                    </ListItem>
+                                ))}
+                                {publicModels.length === 0 && <Typography color="text.secondary">No public models found.</Typography>}
+                            </List>
+                        </>
+                    )}
                 </DialogContent>
-                <DialogActions><Button onClick={() => setDsDialog(false)}>Close</Button></DialogActions>
+                <DialogActions><Button onClick={() => setImportDialog(false)}>Close</Button></DialogActions>
             </Dialog>
         </Box>
     )

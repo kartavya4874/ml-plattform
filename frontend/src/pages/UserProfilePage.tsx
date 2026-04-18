@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { Box, Typography, Avatar, Chip, Tabs, Tab, Card, Grid, Link as MuiLink } from '@mui/material'
-import { GitHub as GithubIcon, Language as WebIcon, Star as StarIcon, People as PeopleIcon } from '@mui/icons-material'
+import { GitHub as GithubIcon, Language as WebIcon, Star as StarIcon, People as PeopleIcon, EmojiEvents as BadgeIcon } from '@mui/icons-material'
 import { api } from '../api/client'
 
 interface Profile {
@@ -19,6 +19,7 @@ export default function UserProfilePage() {
     const [models, setModels] = useState<any[]>([])
     const [notebooks, setNotebooks] = useState<any[]>([])
     const [activity, setActivity] = useState<any[]>([])
+    const [badges, setBadges] = useState<any[]>([])
     const [error, setError] = useState('')
 
     useEffect(() => {
@@ -28,6 +29,13 @@ export default function UserProfilePage() {
         api.get(`/profiles/${username}/models`).then(r => setModels(r.data)).catch(() => {})
         api.get(`/profiles/${username}/notebooks`).then(r => setNotebooks(r.data)).catch(() => {})
         api.get(`/profiles/${username}/activity`).then(r => setActivity(r.data)).catch(() => {})
+        // Use user.id for badges after profile loads (in a real app we might lookup by username in backend)
+        api.get(`/profiles/${username}`).then(r => {
+            setProfile(r.data);
+            if (r.data.id) {
+                api.get(`/badges/user/${r.data.id}`).then(res => setBadges(res.data)).catch(() => {})
+            }
+        }).catch(() => setError('Profile not found or private'))
     }, [username])
 
     if (error) return <Typography color="error">{error}</Typography>
@@ -73,6 +81,7 @@ export default function UserProfilePage() {
                 <Tab label="Datasets" />
                 <Tab label="Models" />
                 <Tab label="Notebooks" />
+                <Tab label="Badges" />
                 <Tab label="Activity" />
             </Tabs>
 
@@ -128,6 +137,30 @@ export default function UserProfilePage() {
             )}
 
             {tab === 3 && (
+                <Grid container spacing={2}>
+                    {badges.length === 0 ? <Grid size={{ xs: 12 }}><Typography color="text.secondary">No public badges</Typography></Grid> : badges.map(b => (
+                        <Grid size={{ xs: 12, sm: 6, md: 4 }} key={b.id}>
+                            <Card sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+                                <Box sx={{ fontSize: 32, background: 'rgba(255,255,255,0.05)', borderRadius: 2, width: 60, height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {b.badge_icon}
+                                </Box>
+                                <Box>
+                                    <Typography variant="subtitle2" fontWeight={700}>{b.badge_name}</Typography>
+                                    <Chip size="small" label={b.badge_tier} sx={{ height: 16, fontSize: 10, mt: 0.5, mb: 0.5,
+                                        ...(b.badge_tier === 'gold' && { background: 'linear-gradient(135deg, #F59E0B, #FCD34D)', color: '#000' }),
+                                        ...(b.badge_tier === 'silver' && { background: 'linear-gradient(135deg, #9CA3AF, #E5E7EB)', color: '#000' }),
+                                        ...(b.badge_tier === 'bronze' && { background: 'linear-gradient(135deg, #B45309, #D97706)', color: '#fff' }),
+                                        ...(b.badge_tier === 'platinum' && { background: 'linear-gradient(135deg, #6366F1, #A855F7)', color: '#fff' }),
+                                    }} />
+                                    <Typography variant="caption" color="text.secondary" display="block">{b.description}</Typography>
+                                </Box>
+                            </Card>
+                        </Grid>
+                    ))}
+                </Grid>
+            )}
+
+            {tab === 4 && (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                     {activity.length === 0 ? <Typography color="text.secondary">No recent activity</Typography> : activity.map(a => (
                         <Card key={a.id} sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center' }}>

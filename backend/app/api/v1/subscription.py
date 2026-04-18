@@ -10,8 +10,9 @@ from app.api.v1.auth import get_current_user
 from app.services.quota_service import (
     get_or_create_subscription, get_or_create_usage,
     get_usage_summary, get_user_tier, get_tier_limits,
-    PRICING_INFO,
+    PRICING_INFO, GPU_PRICING, get_metered_usage_summary,
 )
+from app.services.badges_service import award_manual_badge
 
 router = APIRouter(prefix="/subscription", tags=["Subscription & Billing"])
 
@@ -20,6 +21,12 @@ router = APIRouter(prefix="/subscription", tags=["Subscription & Billing"])
 async def get_pricing():
     """Public endpoint — return all pricing tiers and their features."""
     return PRICING_INFO
+
+
+@router.get("/gpu-pricing")
+async def get_gpu_pricing():
+    """Public endpoint — return GPU pricing info."""
+    return GPU_PRICING
 
 
 @router.get("", response_model=SubscriptionSummary)
@@ -78,12 +85,12 @@ async def upgrade_subscription(
     try:
         new_tier = SubscriptionTier(tier)
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid tier: {tier}. Must be one of: free, pro, enterprise")
+        raise HTTPException(status_code=400, detail=f"Invalid tier: {tier}. Must be one of: free, pro, payg, enterprise")
 
     sub = await get_or_create_subscription(current_user.id)
     
-    # Check ordering: free < pro < enterprise
-    tier_order = {SubscriptionTier.free: 0, SubscriptionTier.pro: 1, SubscriptionTier.enterprise: 2}
+    # Check ordering: free < pro < payg < enterprise
+    tier_order = {SubscriptionTier.free: 0, SubscriptionTier.pro: 1, SubscriptionTier.payg: 2, SubscriptionTier.enterprise: 3}
     if tier_order.get(new_tier, 0) <= tier_order.get(sub.tier, 0):
         raise HTTPException(
             status_code=400,
@@ -93,8 +100,7 @@ async def upgrade_subscription(
 
     sub.tier = new_tier
     sub.status = SubscriptionStatus.active
-    # Note: stripe_customer_id and stripe_subscription_id would be set here
-    # after Stripe checkout completes via webhook
+    # Note: PayU integration will be added when account is activated
     from datetime import datetime, timezone
     sub.updated_at = datetime.now(timezone.utc)
     await sub.save()
@@ -102,14 +108,17 @@ async def upgrade_subscription(
     # Also update the user role to match
     if new_tier == SubscriptionTier.pro:
         current_user.role = "pro"
-    elif new_tier == SubscriptionTier.enterprise:
+        await award_manual_badge(current_user.id, "pro_subscriber")
+    elif new_tier in (SubscriptionTier.payg, SubscriptionTier.enterprise):
         current_user.role = "admin"
+        if new_tier == SubscriptionTier.enterprise:
+            await award_manual_badge(current_user.id, "enterprise_member")
     await current_user.save()
 
     return {
         "message": f"Successfully upgraded to {new_tier.value.capitalize()} plan!",
         "tier": new_tier.value,
-        "note": "Payment gateway not yet configured. This upgrade was applied directly.",
+        "note": "PayU payment gateway integration coming soon. This upgrade was applied directly.",
     }
 
 
@@ -135,6 +144,34 @@ async def cancel_subscription(
     return {
         "message": "Subscription will be cancelled at the end of the current billing period.",
         "current_period_end": sub.current_period_end,
+    }
+
+
+@router.get("/metered-usage")
+async def get_metered_usage(
+    current_user: User = Depends(get_current_user),
+):
+    """Get detailed metered usage breakdown for PAYG users."""
+    tier = await get_user_tier(current_user.id)
+    if tier != SubscriptionTier.payg:
+        return {"message": "Metered usage is only available for Pay-As-You-Go plans.", "breakdown": {}, "total_cost": 0}
+    return await get_metered_usage_summary(current_user.id)
+
+
+@router.get("/estimated-bill")
+async def get_estimated_bill(
+    current_user: User = Depends(get_current_user),
+):
+    """Get estimated bill for current billing period (PAYG users)."""
+    tier = await get_user_tier(current_user.id)
+    if tier != SubscriptionTier.payg:
+        return {"message": "Estimated bill is only available for Pay-As-You-Go plans.", "estimated_bill": 0}
+    summary = await get_metered_usage_summary(current_user.id)
+    return {
+        "base_fee": summary["base_fee"],
+        "usage_cost": summary["total_cost"],
+        "estimated_bill": summary["estimated_bill"],
+        "breakdown": summary["breakdown"],
     }
 
 

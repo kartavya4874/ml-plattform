@@ -13,6 +13,7 @@ export default function ManageProfilePage() {
     const [email, setEmail] = useState(user?.email || '')
     const [username, setUsername] = useState(user?.username || '')
     const [isPublic, setIsPublic] = useState(user?.is_public || false)
+    const [badgesPublic, setBadgesPublic] = useState((user as any)?.badges_public ?? true)
     const [bio, setBio] = useState(user?.bio || '')
     const [website, setWebsite] = useState(user?.website || '')
     const [githubUrl, setGithubUrl] = useState(user?.github_url || '')
@@ -39,6 +40,8 @@ export default function ManageProfilePage() {
         setProfileSuccess('')
         try {
             await api.put('/auth/me', { full_name: fullName, email, username, is_public: isPublic, bio, website, github_url: githubUrl, kaggle_url: kaggleUrl, is_2fa_enabled: is2FA })
+            await api.put('/badges/settings', null, { params: { badges_public: badgesPublic } })
+            await api.post('/badges/check')
             if (avatarFile) {
                 const formData = new FormData();
                 formData.append('file', avatarFile);
@@ -137,6 +140,11 @@ export default function ManageProfilePage() {
                     <FormControlLabel
                         control={<Switch checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} color="primary" />}
                         label="Make profile public to the community"
+                    />
+
+                    <FormControlLabel
+                        control={<Switch checked={badgesPublic} onChange={(e) => setBadgesPublic(e.target.checked)} color="primary" />}
+                        label="Display earned badges on public profile"
                     />
 
                     <FormControlLabel

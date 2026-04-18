@@ -45,6 +45,37 @@ class ChatRequest(BaseModel):
     history: List[ChatMessage]
     message: str
 
+class NotebookAssistRequest(BaseModel):
+    cell_source: str
+    notebook_context: str = ""
+    request_type: str = "general"  # "explain", "fix", "generate", "optimize", "autocomplete", "general"
+    user_message: str = ""
+
+
+NOTEBOOK_SYSTEM_INSTRUCTION = """
+You are an expert Python code assistant embedded inside the Parametrix AI notebook environment (similar to Google Colab).
+Your job is to help users write, debug, explain, and optimize Python code for data science and machine learning.
+
+CONTEXT: The user is working in a cloud-hosted Jupyter-style notebook on the Parametrix AI platform.
+Pre-installed libraries: numpy, pandas, scikit-learn, matplotlib, seaborn, scipy, statsmodels, pillow, requests, torch, tensorflow.
+
+YOUR BEHAVIOR BASED ON REQUEST TYPE:
+- "explain": Provide a clear, step-by-step explanation of the code. Use bullet points and simple language.
+- "fix": Identify bugs, syntax errors, or logical issues. Show the corrected code with explanations.
+- "generate": Generate Python code based on the user's description. Include comments.
+- "optimize": Suggest performance improvements, best practices, and cleaner code patterns.
+- "autocomplete": Complete the code snippet naturally. Return ONLY the completion, no explanation.
+- "general": Answer the user's question about the code or general Python/ML topics.
+
+FORMATTING RULES:
+- Always use Markdown formatting.
+- Wrap code in ```python blocks.
+- Be concise but thorough.
+- If fixing code, show both the problem and the solution.
+- When generating code, include helpful comments.
+"""
+
+
 @router.post("/")
 async def chat_with_gemini(req: ChatRequest):
     """
@@ -99,3 +130,51 @@ async def chat_with_gemini(req: ChatRequest):
     except Exception as e:
         log.error("gemini_chat_failed", error=str(e))
         raise HTTPException(status_code=500, detail="The AI Assistant is currently unavailable.")
+
+
+@router.post("/notebook-assist")
+async def notebook_ai_assist(req: NotebookAssistRequest):
+    """
+    Context-aware AI code assistant for notebooks.
+    Supports: explain, fix, generate, optimize, autocomplete, general questions.
+    """
+    if not settings.GEMINI_API_KEY:
+        raise HTTPException(status_code=503, detail="AI Assistant is disabled (Missing API Key).")
+
+    try:
+        model = genai.GenerativeModel(
+            model_name="gemini-2.5-flash",
+            system_instruction=NOTEBOOK_SYSTEM_INSTRUCTION
+        )
+
+        # Build the prompt based on request type
+        prompt_parts = []
+
+        if req.notebook_context:
+            prompt_parts.append(f"NOTEBOOK CONTEXT (surrounding cells):\n```python\n{req.notebook_context}\n```\n")
+
+        if req.cell_source:
+            prompt_parts.append(f"CURRENT CELL CODE:\n```python\n{req.cell_source}\n```\n")
+
+        type_prompts = {
+            "explain": "Please explain this code clearly step by step.",
+            "fix": "Find and fix any bugs, errors, or issues in this code. Show the corrected version.",
+            "generate": f"Generate Python code for: {req.user_message}" if req.user_message else "Generate code to continue from the current cell.",
+            "optimize": "Optimize this code for better performance, readability, and best practices.",
+            "autocomplete": "Complete this code naturally. Return ONLY the code completion, no explanations.",
+            "general": req.user_message or "Help me with this code.",
+        }
+
+        prompt_parts.append(type_prompts.get(req.request_type, req.user_message or "Help me with this code."))
+
+        if req.user_message and req.request_type != "general" and req.request_type != "generate":
+            prompt_parts.append(f"\nAdditional context from user: {req.user_message}")
+
+        full_prompt = "\n\n".join(prompt_parts)
+
+        response = model.generate_content(full_prompt)
+        return {"reply": response.text}
+
+    except Exception as e:
+        log.error("notebook_assist_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="AI Code Assistant is temporarily unavailable.")

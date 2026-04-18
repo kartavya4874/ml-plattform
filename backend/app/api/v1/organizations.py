@@ -1,13 +1,18 @@
 """Organizations routes — /api/v1/orgs/"""
 import uuid
 import re
+import secrets
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
-from app.models.models import User, Organization, OrgMembership
+from app.models.models import (
+    User, Organization, OrgMembership, OrgInvite,
+    SubscriptionTier,
+)
 from app.api.v1.auth import get_current_user
+from app.services.quota_service import get_user_tier
 
 router = APIRouter(prefix="/orgs", tags=["Organizations"])
 
@@ -24,6 +29,8 @@ class OrgOut(BaseModel):
     avatar_url: Optional[str]
     owner_id: uuid.UUID
     is_public: bool
+    allowed_email_domains: List[str] = []
+    whitelabel_config: Optional[dict] = None
     created_at: datetime
 
 class MemberOut(BaseModel):
@@ -34,6 +41,29 @@ class MemberOut(BaseModel):
     avatar_url: Optional[str]
     role: str
     created_at: datetime
+
+class InviteOut(BaseModel):
+    id: uuid.UUID
+    email: str
+    role: str
+    accepted: bool
+    created_at: datetime
+    expires_at: datetime
+
+class InviteRequest(BaseModel):
+    email: str
+    role: str = "member"
+
+class EmailDomainsUpdate(BaseModel):
+    allowed_email_domains: List[str]
+
+class WhitelabelUpdate(BaseModel):
+    brand_name: Optional[str] = None
+    logo_url: Optional[str] = None
+    primary_color: Optional[str] = None
+    accent_color: Optional[str] = None
+    welcome_message: Optional[str] = None
+    custom_domain: Optional[str] = None
 
 
 @router.post("/", response_model=OrgOut, status_code=201)
@@ -88,6 +118,207 @@ async def get_org_members(slug: str):
     return result
 
 
+# ─── Email Domain Constraints (Enterprise) ──────────────────────────────────
+
+@router.put("/{slug}/email-domains")
+async def update_email_domains(
+    slug: str,
+    body: EmailDomainsUpdate,
+    current_user: User = Depends(get_current_user),
+):
+    """Set allowed email domains for the organization (Enterprise only)."""
+    org = await Organization.find_one(Organization.slug == slug)
+    if not org:
+        raise HTTPException(404, "Organization not found")
+
+    membership = await OrgMembership.find_one(
+        OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
+    )
+    if not membership or membership.role not in ("owner", "admin"):
+        raise HTTPException(403, "Only owners/admins can update email domains")
+
+    # Validate tier — only enterprise orgs can set email constraints
+    tier = await get_user_tier(current_user.id)
+    if tier not in (SubscriptionTier.enterprise, SubscriptionTier.payg):
+        raise HTTPException(403, "Email domain restrictions are available on Enterprise and Pay-As-You-Go plans")
+
+    # Validate domains
+    cleaned = []
+    for domain in body.allowed_email_domains:
+        d = domain.strip().lower()
+        if d and re.match(r'^[a-z0-9.-]+\.[a-z]{2,}$', d):
+            cleaned.append(d)
+        elif d:
+            raise HTTPException(400, f"Invalid domain format: {d}")
+
+    org.allowed_email_domains = cleaned
+    org.updated_at = datetime.now(timezone.utc)
+    await org.save()
+    return {"message": "Email domains updated", "allowed_email_domains": cleaned}
+
+
+# ─── Invite System ──────────────────────────────────────────────────────────
+
+def _validate_email_domain(email: str, allowed_domains: List[str]) -> bool:
+    """Check if email matches one of the allowed domains."""
+    if not allowed_domains:
+        return True  # No restrictions
+    domain = email.split("@")[-1].lower()
+    return domain in allowed_domains
+
+
+@router.post("/{slug}/invite", response_model=InviteOut)
+async def invite_member(
+    slug: str,
+    body: InviteRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Send an invitation to join the organization."""
+    org = await Organization.find_one(Organization.slug == slug)
+    if not org:
+        raise HTTPException(404, "Organization not found")
+
+    membership = await OrgMembership.find_one(
+        OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
+    )
+    if not membership or membership.role not in ("owner", "admin"):
+        raise HTTPException(403, "Only owners/admins can invite members")
+
+    # Validate email domain
+    if not _validate_email_domain(body.email, org.allowed_email_domains):
+        allowed = ", ".join(org.allowed_email_domains)
+        raise HTTPException(
+            400,
+            f"Email domain not allowed. This organization only accepts emails from: {allowed}"
+        )
+
+    # Check for existing invite
+    existing = await OrgInvite.find_one(
+        OrgInvite.org_id == org.id,
+        OrgInvite.email == body.email.lower(),
+        OrgInvite.accepted == False,
+    )
+    if existing:
+        raise HTTPException(409, "An invite has already been sent to this email")
+
+    # Check if user is already a member
+    target_user = await User.find_one(User.email == body.email.lower())
+    if target_user:
+        existing_membership = await OrgMembership.find_one(
+            OrgMembership.org_id == org.id, OrgMembership.user_id == target_user.id
+        )
+        if existing_membership:
+            raise HTTPException(409, "User is already a member of this organization")
+
+    invite = OrgInvite(
+        org_id=org.id,
+        email=body.email.lower(),
+        role=body.role,
+        invited_by=current_user.id,
+        token=secrets.token_urlsafe(32),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+    )
+    await invite.insert()
+
+    # TODO: Send invitation email via email_service
+
+    return invite
+
+
+@router.get("/{slug}/invites", response_model=List[InviteOut])
+async def list_invites(
+    slug: str,
+    current_user: User = Depends(get_current_user),
+):
+    """List pending invites for an organization."""
+    org = await Organization.find_one(Organization.slug == slug)
+    if not org:
+        raise HTTPException(404, "Organization not found")
+
+    membership = await OrgMembership.find_one(
+        OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
+    )
+    if not membership or membership.role not in ("owner", "admin"):
+        raise HTTPException(403, "Only owners/admins can view invites")
+
+    invites = await OrgInvite.find(
+        OrgInvite.org_id == org.id,
+        OrgInvite.accepted == False,
+    ).sort(-OrgInvite.created_at).to_list()
+    return invites
+
+
+@router.delete("/{slug}/invites/{invite_id}", status_code=204)
+async def revoke_invite(
+    slug: str,
+    invite_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+):
+    """Revoke a pending invite."""
+    org = await Organization.find_one(Organization.slug == slug)
+    if not org:
+        raise HTTPException(404, "Organization not found")
+
+    membership = await OrgMembership.find_one(
+        OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
+    )
+    if not membership or membership.role not in ("owner", "admin"):
+        raise HTTPException(403, "Only owners/admins can revoke invites")
+
+    invite = await OrgInvite.get(invite_id)
+    if not invite or invite.org_id != org.id:
+        raise HTTPException(404, "Invite not found")
+
+    await invite.delete()
+
+
+@router.post("/join/{invite_token}")
+async def accept_invite(
+    invite_token: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Accept an organization invitation."""
+    invite = await OrgInvite.find_one(OrgInvite.token == invite_token)
+    if not invite:
+        raise HTTPException(404, "Invalid or expired invite link")
+
+    if invite.accepted:
+        raise HTTPException(400, "This invite has already been used")
+
+    if invite.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(400, "This invite has expired")
+
+    org = await Organization.get(invite.org_id)
+    if not org:
+        raise HTTPException(404, "Organization not found")
+
+    # Validate email domain
+    if not _validate_email_domain(current_user.email, org.allowed_email_domains):
+        allowed = ", ".join(org.allowed_email_domains)
+        raise HTTPException(
+            403,
+            f"Your email domain is not allowed. This organization requires: {allowed}"
+        )
+
+    # Check if already a member
+    existing = await OrgMembership.find_one(
+        OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
+    )
+    if existing:
+        raise HTTPException(409, "You are already a member")
+
+    # Create membership
+    await OrgMembership(
+        org_id=org.id, user_id=current_user.id, role=invite.role
+    ).insert()
+
+    # Mark invite as accepted
+    invite.accepted = True
+    await invite.save()
+
+    return {"message": f"Welcome to {org.name}!", "org_slug": org.slug}
+
+
 @router.post("/{slug}/members")
 async def add_member(slug: str, user_id: uuid.UUID, current_user: User = Depends(get_current_user)):
     org = await Organization.find_one(Organization.slug == slug)
@@ -97,6 +328,13 @@ async def add_member(slug: str, user_id: uuid.UUID, current_user: User = Depends
     membership = await OrgMembership.find_one(OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id)
     if not membership or membership.role not in ("owner", "admin"):
         raise HTTPException(403, "Only owners/admins can add members")
+
+    # Validate email domain if constraints set
+    target_user = await User.get(user_id)
+    if target_user and org.allowed_email_domains:
+        if not _validate_email_domain(target_user.email, org.allowed_email_domains):
+            allowed = ", ".join(org.allowed_email_domains)
+            raise HTTPException(400, f"User's email domain not allowed. Required: {allowed}")
 
     existing = await OrgMembership.find_one(OrgMembership.org_id == org.id, OrgMembership.user_id == user_id)
     if existing:
@@ -123,3 +361,55 @@ async def remove_member(slug: str, user_id: uuid.UUID, current_user: User = Depe
         raise HTTPException(400, "Cannot remove the owner")
 
     await target.delete()
+
+
+# ─── White-labeling (Enterprise) ────────────────────────────────────────────
+
+@router.get("/{slug}/whitelabel")
+async def get_whitelabel(slug: str):
+    """Get white-label config for org (used by frontend for theming)."""
+    org = await Organization.find_one(Organization.slug == slug)
+    if not org:
+        raise HTTPException(404, "Organization not found")
+    return org.whitelabel_config or {}
+
+
+@router.put("/{slug}/whitelabel")
+async def update_whitelabel(
+    slug: str,
+    body: WhitelabelUpdate,
+    current_user: User = Depends(get_current_user),
+):
+    """Update white-label configuration (Enterprise only)."""
+    org = await Organization.find_one(Organization.slug == slug)
+    if not org:
+        raise HTTPException(404, "Organization not found")
+
+    membership = await OrgMembership.find_one(
+        OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
+    )
+    if not membership or membership.role not in ("owner", "admin"):
+        raise HTTPException(403, "Only owners/admins can update branding")
+
+    tier = await get_user_tier(current_user.id)
+    if tier != SubscriptionTier.enterprise:
+        raise HTTPException(403, "White-labeling is available on the Enterprise plan only")
+
+    config = org.whitelabel_config or {}
+    if body.brand_name is not None:
+        config["brand_name"] = body.brand_name
+    if body.logo_url is not None:
+        config["logo_url"] = body.logo_url
+    if body.primary_color is not None:
+        config["primary_color"] = body.primary_color
+    if body.accent_color is not None:
+        config["accent_color"] = body.accent_color
+    if body.welcome_message is not None:
+        config["welcome_message"] = body.welcome_message
+    if body.custom_domain is not None:
+        config["custom_domain"] = body.custom_domain
+
+    org.whitelabel_config = config
+    org.updated_at = datetime.now(timezone.utc)
+    await org.save()
+    return {"message": "Branding updated", "whitelabel_config": config}

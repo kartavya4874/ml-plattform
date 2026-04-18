@@ -12,6 +12,7 @@ import {
     PlayArrow, TableChart, Image as ImgIcon, TextFields, CheckCircle,
     Cancel as CancelIcon, Visibility, VisibilityOff,
     ExpandMore as ExpandMoreIcon, Tune as TuneIcon, RestartAlt as ResetIcon,
+    Memory as GpuIcon
 } from '@mui/icons-material'
 import { fetchDatasets } from '../store/dataSlice'
 import { fetchJobs, submitJob, cancelJob, appendLog, setProgress, resetLive } from '../store/trainingSlice'
@@ -77,6 +78,11 @@ export default function TrainingStudio() {
     const [testSize, setTestSize] = useState(0.2)
     const [crossValidation, setCrossValidation] = useState<number | null>(null)
     const [excludedCols, setExcludedCols] = useState<string[]>([])
+    
+    // GPU settings
+    const [gpuEnabled, setGpuEnabled] = useState(false)
+    const [gpuType, setGpuType] = useState('T4')
+
 
     useEffect(() => { dispatch(fetchDatasets()); dispatch(fetchJobs()); }, [dispatch])
 
@@ -160,6 +166,8 @@ export default function TrainingStudio() {
                 test_size: testSize,
                 cross_validation: crossValidation,
                 excluded_columns: excludedCols,
+                gpu_enabled: gpuEnabled,
+                gpu_type: gpuType,
             },
         }
         if (isTabular && targetColumn) payload.target_column = targetColumn
@@ -748,6 +756,74 @@ export default function TrainingStudio() {
                                     <FormHelperText>Percentage of data reserved for testing (not used in training)</FormHelperText>
                                 </Grid>
                             </Grid>
+                        </AccordionDetails>
+                    </Accordion>
+
+                    {/* GPU Settings Accordion */}
+                    <Accordion
+                        sx={{ mt: 2, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px !important', '&:before': { display: 'none' } }}
+                        disableGutters
+                    >
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <GpuIcon fontSize="small" sx={{ color: gpuEnabled ? '#10B981' : '#6B7280' }} />
+                                <Typography variant="body2" fontWeight={600}>Hardware Setup (GPU)</Typography>
+                                {gpuEnabled && <Chip label={gpuType} size="small" sx={{ height: 20, fontSize: 10, background: 'rgba(16,185,129,0.1)', color: '#10B981' }} />}
+                            </Box>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                                <Checkbox
+                                    checked={gpuEnabled}
+                                    onChange={(e) => setGpuEnabled(e.target.checked)}
+                                    color="primary"
+                                />
+                                <Box>
+                                    <Typography variant="body2" fontWeight={600}>Enable GPU Acceleration</Typography>
+                                    <Typography variant="caption" color="text.secondary">Speed up training for large datasets or image/text tasks</Typography>
+                                </Box>
+                            </Box>
+                            
+                            <Collapse in={gpuEnabled}>
+                                <Grid container spacing={2}>
+                                    <Grid size={{ xs: 12, sm: 6 }}>
+                                        <Card
+                                            sx={{
+                                                cursor: 'pointer',
+                                                border: gpuType === 'T4' ? '2px solid #6366F1' : '2px solid transparent',
+                                                bgcolor: 'rgba(0,0,0,0.2)'
+                                            }}
+                                            onClick={() => setGpuType('T4')}
+                                        >
+                                            <CardContent sx={{ p: 2, pb: '16px !important' }}>
+                                                <Typography variant="subtitle2" fontWeight={700}>NVIDIA T4</Typography>
+                                                <Typography variant="caption" display="block" color="text.secondary">16GB VRAM · Good for tabular & NLP</Typography>
+                                                <Typography variant="body2" mt={1} color="primary.light">Cost: ₹15 / hour</Typography>
+                                            </CardContent>
+                                        </Card>
+                                    </Grid>
+                                    <Grid size={{ xs: 12, sm: 6 }}>
+                                        <Card
+                                            sx={{
+                                                cursor: 'pointer',
+                                                border: gpuType === 'A100' ? '2px solid #6366F1' : '2px solid transparent',
+                                                bgcolor: 'rgba(0,0,0,0.2)'
+                                            }}
+                                            onClick={() => setGpuType('A100')}
+                                        >
+                                            <CardContent sx={{ p: 2, pb: '16px !important' }}>
+                                                <Typography variant="subtitle2" fontWeight={700}>NVIDIA A100 <Chip label="Fastest" size="small" sx={{ height: 16, fontSize: 9 }} /></Typography>
+                                                <Typography variant="caption" display="block" color="text.secondary">40GB VRAM · Best for LLMs & Vision</Typography>
+                                                <Typography variant="body2" mt={1} color="primary.light">Cost: ₹45 / hour</Typography>
+                                            </CardContent>
+                                        </Card>
+                                    </Grid>
+                                </Grid>
+                                
+                                <Alert severity="info" sx={{ mt: 3, borderRadius: 2 }}>
+                                    Estimated cost for this job: <strong>₹{((timeLimit / 3600) * (gpuType === 'T4' ? 15 : 45)).toFixed(2)}</strong> max limit. You are only billed for actual compute time.
+                                </Alert>
+                            </Collapse>
                         </AccordionDetails>
                     </Accordion>
 

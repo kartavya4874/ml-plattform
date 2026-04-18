@@ -10,6 +10,7 @@ import {
     RocketLaunch as RocketIcon,
     Diamond as DiamondIcon,
     AutoAwesome as SparkleIcon,
+    Speed as SpeedIcon,
 } from '@mui/icons-material'
 import { fetchPricing, fetchSubscription, upgradeTier } from '../store/subscriptionSlice'
 import type { AppDispatch, RootState } from '../store/store'
@@ -18,24 +19,28 @@ import type { PricingTier } from '../store/subscriptionSlice'
 const tierIcons: Record<string, React.ReactNode> = {
     free: <SparkleIcon />,
     pro: <RocketIcon />,
+    payg: <SpeedIcon />,
     enterprise: <DiamondIcon />,
 }
 
 const tierGradients: Record<string, string> = {
     free: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(99,102,241,0.05))',
     pro: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(99,102,241,0.08))',
+    payg: 'linear-gradient(135deg, rgba(16,185,129,0.18), rgba(6,182,212,0.06))',
     enterprise: 'linear-gradient(135deg, rgba(245,158,11,0.2), rgba(236,72,153,0.08))',
 }
 
 const tierBorders: Record<string, string> = {
     free: 'rgba(99,102,241,0.2)',
     pro: 'rgba(139,92,246,0.4)',
+    payg: 'rgba(16,185,129,0.3)',
     enterprise: 'rgba(245,158,11,0.3)',
 }
 
 const tierAccent: Record<string, string> = {
     free: '#6366F1',
     pro: '#8B5CF6',
+    payg: '#10B981',
     enterprise: '#F59E0B',
 }
 
@@ -48,7 +53,7 @@ function PricingCard({ plan, currentTier, onUpgrade, upgrading }: {
     const isCurrent = currentTier === plan.tier
     const isPopular = plan.is_popular
     const accent = tierAccent[plan.tier] || '#6366F1'
-    const tierOrder: Record<string, number> = { free: 0, pro: 1, enterprise: 2 }
+    const tierOrder: Record<string, number> = { free: 0, pro: 1, payg: 2, enterprise: 3 }
     const canUpgrade = tierOrder[plan.tier] > tierOrder[currentTier]
 
     return (
@@ -118,10 +123,12 @@ function PricingCard({ plan, currentTier, onUpgrade, upgrading }: {
                             background: `linear-gradient(135deg, ${accent}, ${accent}CC)`,
                             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                         }}>
-                            {plan.price_monthly === 0 ? 'Free' : `₹${plan.price_monthly}`}
+                            {plan.price_monthly === 0 ? 'Free' : plan.tier === 'payg' ? '₹499+' : `₹${plan.price_monthly.toLocaleString()}`}
                         </Typography>
                         {plan.price_monthly > 0 && (
-                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>/month</Typography>
+                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                                {plan.tier === 'payg' ? 'base + usage' : '/month'}
+                            </Typography>
                         )}
                     </Box>
                     <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
@@ -252,7 +259,7 @@ export default function PricingPage() {
             ) : (
                 <Grid container spacing={3} sx={{ mb: 6, alignItems: 'stretch' }}>
                     {pricing.map((plan) => (
-                        <Grid size={{ xs: 12, md: 4 }} key={plan.tier}>
+                        <Grid size={{ xs: 12, md: 3 }} key={plan.tier}>
                             <PricingCard
                                 plan={plan}
                                 currentTier={currentTier}
@@ -317,7 +324,7 @@ export default function PricingPage() {
             {/* FAQ / Note */}
             <Box sx={{ textAlign: 'center', pb: 4 }}>
                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    💳 Payment gateway coming soon. For now, tier upgrades are applied directly.
+                💳 PayU payment gateway activating soon. For now, tier upgrades are applied directly.
                 </Typography>
             </Box>
         </Box>

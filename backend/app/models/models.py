@@ -21,6 +21,7 @@ class UserRole(str, enum.Enum):
 class SubscriptionTier(str, enum.Enum):
     free = "free"
     pro = "pro"
+    payg = "payg"
     enterprise = "enterprise"
 
 class SubscriptionStatus(str, enum.Enum):
@@ -86,6 +87,7 @@ class User(Document):
     kaggle_url: Optional[str] = None
     followers_count: int = 0
     following_count: int = 0
+    badges_public: bool = True  # master toggle for badge visibility on public profile
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
@@ -133,6 +135,9 @@ class TrainingJob(Document):
     logs: List[Any] = Field(default_factory=list)
     metrics: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
+    gpu_enabled: bool = False
+    gpu_type: Optional[str] = None  # "T4", "A10G", "A100"
+    compute_cost: float = 0.0  # cost in INR for PAYG users
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=utcnow)
@@ -231,6 +236,7 @@ class Subscription(Document):
     status: SubscriptionStatus = SubscriptionStatus.active
     stripe_customer_id: Optional[str] = None
     stripe_subscription_id: Optional[str] = None
+    payu_merchant_key: Optional[str] = None  # PayU integration
     current_period_start: datetime = Field(default_factory=utcnow)
     current_period_end: Optional[datetime] = None
     cancel_at_period_end: bool = False
@@ -253,12 +259,29 @@ class UsageRecord(Document):
     deployments_active: int = 0
     inference_requests: int = 0
     storage_bytes_used: int = 0
+    gpu_minutes_used: float = 0.0
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
     class Settings:
         name = "usage_records"
         indexes = [[("user_id", 1)]]
+
+
+class UsageMeteredEvent(Document):
+    """Individual metered usage events for PAYG billing."""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    user_id: uuid.UUID
+    event_type: str  # "gpu_minute", "cpu_minute", "storage_gb", "api_call", "training_job"
+    quantity: float
+    unit_price: float  # price per unit in INR
+    total_cost: float
+    event_metadata: Optional[Dict[str, Any]] = None
+    created_at: datetime = Field(default_factory=utcnow)
+
+    class Settings:
+        name = "usage_metered_events"
+        indexes = [[("user_id", 1), ("created_at", -1)]]
 
 
 class Invoice(Document):
@@ -391,7 +414,8 @@ class Notebook(Document):
     star_count: int = 0
     fork_count: int = 0
     runtime_config: Dict[str, Any] = Field(default_factory=lambda: {
-        "python_version": "3.11", "timeout_seconds": 30
+        "python_version": "3.11", "timeout_seconds": 30,
+        "gpu_enabled": False, "gpu_type": None,
     })
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
@@ -451,6 +475,9 @@ class Organization(Document):
     avatar_url: Optional[str] = None
     owner_id: uuid.UUID
     is_public: bool = True
+    # Enterprise features
+    allowed_email_domains: List[str] = Field(default_factory=list)  # e.g. ["iitb.ac.in", "company.com"]
+    whitelabel_config: Optional[Dict[str, Any]] = None  # {"brand_name", "logo_url", "primary_color", "accent_color", "welcome_message", "custom_domain"}
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
@@ -468,6 +495,23 @@ class OrgMembership(Document):
     class Settings:
         name = "org_memberships"
         indexes = [[("org_id", 1), ("user_id", 1)]]
+
+
+class OrgInvite(Document):
+    """Pending organization invitations with email domain validation."""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    org_id: uuid.UUID
+    email: str
+    role: str = "member"
+    invited_by: uuid.UUID
+    token: Indexed(str, unique=True)
+    accepted: bool = False
+    created_at: datetime = Field(default_factory=utcnow)
+    expires_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    class Settings:
+        name = "org_invites"
+        indexes = [[("org_id", 1), ("email", 1)]]
 
 
 class Notification(Document):
@@ -498,3 +542,22 @@ class ContactMessage(Document):
     class Settings:
         name = "contact_messages"
         indexes = [[("created_at", -1)]]
+
+
+# ─── Profile Badges & Achievements ──────────────────────────────────────────
+
+class UserBadge(Document):
+    """Achievement badges earned by users."""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    user_id: uuid.UUID
+    badge_type: str       # "first_model", "10_datasets", "gpu_pioneer", etc.
+    badge_name: str       # "First Model", "Data Curator", etc.
+    badge_icon: str       # emoji
+    badge_tier: str       # "bronze", "silver", "gold", "platinum"
+    description: str
+    is_public: bool = True
+    earned_at: datetime = Field(default_factory=utcnow)
+
+    class Settings:
+        name = "user_badges"
+        indexes = [[("user_id", 1), ("badge_type", 1)]]
