@@ -77,8 +77,8 @@ export default function ChatWidget() {
             setHistory(prev => [...prev, {
                 role: 'model',
                 parts: [
-                    error.response?.data?.detail 
-                    || "I'm sorry, I'm currently unable to reach the Parametrix AI brain. Please make sure the Gemini API key is configured or try again later."
+                                error.response?.data?.detail 
+                                || "I am currently experiencing high network traffic. Please try again in a few moments, or reach out to support if the issue persists."
                 ]
             }])
         } finally {
