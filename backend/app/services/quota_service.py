@@ -72,8 +72,8 @@ PRICING_INFO = [
     {
         "tier": "pro",
         "name": "Pro",
-        "price_monthly": 2499,
-        "price_label": "₹2,499/mo",
+        "price_monthly": 2999,
+        "price_label": "₹2,999/mo",
         "description": "For professionals and teams building production ML pipelines.",
         "limits": {
             "datasets": 25,
@@ -100,8 +100,8 @@ PRICING_INFO = [
     {
         "tier": "enterprise",
         "name": "Enterprise",
-        "price_monthly": 7999,
-        "price_label": "₹7,999/mo",
+        "price_monthly": 15999,
+        "price_label": "₹15,999/mo",
         "description": "Unlimited scale for large teams and enterprise deployments.",
         "limits": {
             "datasets": 999_999,

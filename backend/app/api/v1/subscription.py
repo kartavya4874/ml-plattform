@@ -150,8 +150,8 @@ async def get_invoices(
         mock_inv = Invoice(
             user_id=current_user.id,
             subscription_id=sub.id,
-            amount_due=2499.0 if sub.tier == SubscriptionTier.pro else 7999.0,
-            amount_paid=2499.0 if sub.tier == SubscriptionTier.pro else 7999.0,
+            amount_due=2999.0 if sub.tier == SubscriptionTier.pro else 15999.0,
+            amount_paid=2999.0 if sub.tier == SubscriptionTier.pro else 15999.0,
             status="paid",
             billing_reason="subscription_cycle"
         )
