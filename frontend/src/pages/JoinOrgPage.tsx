@@ -3,12 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Container, Paper, Typography, Box, Button, CircularProgress, Alert } from '@mui/material';
 import { Business as BusinessIcon, CheckCircle as CheckCircleIcon } from '@mui/icons-material';
 import { api } from '../api/client';
-import { useSelector } from 'react-redux';
-import type { RootState } from '../store/store';
+import { useSelector, useDispatch } from 'react-redux';
+import { fetchMe } from '../store/authSlice';
+import type { RootState, AppDispatch } from '../store/store';
 
 export default function JoinOrgPage() {
     const { token } = useParams<{ token: string }>();
     const navigate = useNavigate();
+    const dispatch = useDispatch<AppDispatch>();
     const { user } = useSelector((s: RootState) => s.auth);
     const isAuthenticated = !!user;
 
@@ -32,8 +34,9 @@ export default function JoinOrgPage() {
         const joinOrg = async () => {
             try {
                 await api.post(`/orgs/join/${token}`);
+                await dispatch(fetchMe());
                 setStatus('success');
-                setMessage('Successfully joined the organization!');
+                setMessage('Successfully joined the organization! Your account has been upgraded.');
             } catch (e: any) {
                 setStatus('error');
                 setMessage(e.response?.data?.detail || 'Failed to join organization. The link may have expired.');

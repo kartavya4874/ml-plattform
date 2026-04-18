@@ -338,7 +338,15 @@ async def accept_invite(
     invite.accepted = True
     await invite.save()
 
-    return {"message": f"Welcome to {org.name}!", "org_slug": org.slug}
+    # Auto-upgrade user to enterprise tier to match org benefits
+    from app.services.quota_service import get_or_create_subscription
+    from app.models.models import SubscriptionTier, SubscriptionStatus
+    sub = await get_or_create_subscription(current_user.id)
+    sub.tier = SubscriptionTier.enterprise
+    sub.status = SubscriptionStatus.active
+    await sub.save()
+
+    return {"message": f"Welcome to {org.name}! Your account has been upgraded to Enterprise.", "org_slug": org.slug}
 
 
 @router.post("/{slug}/members")
@@ -363,7 +371,16 @@ async def add_member(slug: str, user_id: uuid.UUID, current_user: User = Depends
         raise HTTPException(409, "User is already a member")
 
     await OrgMembership(org_id=org.id, user_id=user_id, role="member").insert()
-    return {"message": "Member added"}
+    
+    # Auto-upgrade to enterprise
+    from app.services.quota_service import get_or_create_subscription
+    from app.models.models import SubscriptionTier, SubscriptionStatus
+    sub = await get_or_create_subscription(user_id)
+    sub.tier = SubscriptionTier.enterprise
+    sub.status = SubscriptionStatus.active
+    await sub.save()
+
+    return {"message": "Member added and upgraded to Enterprise"}
 
 
 @router.delete("/{slug}/members/{user_id}", status_code=204)
