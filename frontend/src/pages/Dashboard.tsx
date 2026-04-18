@@ -372,7 +372,7 @@ function ActivityFeed() {
     const [activities, setActivities] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     useEffect(() => {
-        api.get('/notifications/', { params: { limit: 10 } })
+        api.get('/notifications', { params: { limit: 10 } })
             .then(({ data }) => setActivities(data))
             .catch(() => {})
             .finally(() => setLoading(false))

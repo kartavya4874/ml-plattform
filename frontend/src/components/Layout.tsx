@@ -84,7 +84,7 @@ export default function Layout() {
         try {
             const [countRes, listRes] = await Promise.all([
                 api.get('/notifications/count'),
-                api.get('/notifications/', { params: { limit: 20 } }),
+                api.get('/notifications', { params: { limit: 20 } }),
             ])
             setUnreadCount(countRes.data.unread)
             setNotifications(listRes.data)
@@ -96,7 +96,7 @@ export default function Layout() {
         fetchNotifs()
 
         // Fetch User's Organizations for White-label Check
-        api.get('/orgs/').then(res => {
+        api.get('/orgs').then(res => {
             if (res.data && res.data.length > 0) {
                 // Find first org with a valid whitelabel_config
                 const orgWithBrand = res.data.find((o: any) => o.whitelabel_config?.brand_name || o.whitelabel_config?.logo_url)

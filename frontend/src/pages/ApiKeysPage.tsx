@@ -62,7 +62,7 @@ export default function ApiKeysPage() {
 
     const fetchModels = async () => {
         try {
-            const { data } = await api.get('/models/')
+            const { data } = await api.get('/models')
             setModels(data.filter((m: any) => m.stage === 'staging' || m.stage === 'production'))
         } catch { /* ignore */ }
     }

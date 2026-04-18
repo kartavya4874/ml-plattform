@@ -39,7 +39,7 @@ const initialState: ModelsState = {
 
 export const fetchModels = createAsyncThunk('models/fetchModels', async (_, { rejectWithValue }) => {
     try {
-        const { data } = await api.get('/models/')
+        const { data } = await api.get('/models')
         return data
     } catch (e: any) {
         return rejectWithValue(e.response?.data?.detail || 'Failed to fetch models')
