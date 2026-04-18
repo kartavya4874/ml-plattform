@@ -66,7 +66,7 @@ class WhitelabelUpdate(BaseModel):
     custom_domain: Optional[str] = None
 
 
-@router.post("/", response_model=OrgOut, status_code=201)
+@router.post("", response_model=OrgOut, status_code=201)
 async def create_org(body: OrgCreate, current_user: User = Depends(get_current_user)):
     slug = re.sub(r"[^a-z0-9]+", "-", body.name.lower()).strip("-")
     existing = await Organization.find_one(Organization.slug == slug)
@@ -79,7 +79,7 @@ async def create_org(body: OrgCreate, current_user: User = Depends(get_current_u
     return org
 
 
-@router.get("/", response_model=List[OrgOut])
+@router.get("", response_model=List[OrgOut])
 async def list_my_orgs(current_user: User = Depends(get_current_user)):
     memberships = await OrgMembership.find(OrgMembership.user_id == current_user.id).to_list()
     org_ids = [m.org_id for m in memberships]

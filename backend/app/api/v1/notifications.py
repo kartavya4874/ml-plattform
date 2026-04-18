@@ -21,7 +21,7 @@ class NotificationOut(BaseModel):
     created_at: datetime
 
 
-@router.get("/", response_model=list[NotificationOut])
+@router.get("", response_model=list[NotificationOut])
 async def list_notifications(
     unread_only: bool = False,
     limit: int = 50,

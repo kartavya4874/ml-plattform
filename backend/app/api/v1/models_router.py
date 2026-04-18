@@ -10,7 +10,7 @@ from app.api.v1.auth import get_current_user
 router = APIRouter(prefix="/models", tags=["Model Registry"])
 
 
-@router.get("/", response_model=list[ModelOut])
+@router.get("", response_model=list[ModelOut])
 async def list_models(
     task_type: str | None = None,
     stage: str | None = None,

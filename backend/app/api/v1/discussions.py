@@ -43,7 +43,7 @@ class DiscussionOut(BaseModel):
     comment_count: int = 0
     created_at: datetime
 
-@router.post("/", response_model=DiscussionOut, status_code=201)
+@router.post("", response_model=DiscussionOut, status_code=201)
 async def create_discussion(body: DiscussionCreate, current_user: User = Depends(get_current_user)):
     discussion = Discussion(
         author_id=current_user.id,
@@ -55,7 +55,7 @@ async def create_discussion(body: DiscussionCreate, current_user: User = Depends
     await discussion.insert()
     return {**discussion.dict(), "comment_count": 0}
 
-@router.get("/", response_model=List[DiscussionOut])
+@router.get("", response_model=List[DiscussionOut])
 async def list_discussions(resource_type: Optional[str] = None, resource_id: Optional[uuid.UUID] = None):
     query = {}
     if resource_type: query["resource_type"] = resource_type

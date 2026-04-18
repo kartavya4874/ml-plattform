@@ -68,7 +68,7 @@ def _require_admin(user: User):
         raise HTTPException(403, "Admin access required")
 
 
-@router.post("/", response_model=CompetitionOut, status_code=201)
+@router.post("", response_model=CompetitionOut, status_code=201)
 async def create_competition(body: CompetitionCreate, current_user: User = Depends(get_current_user)):
     _require_admin(current_user)
     comp = Competition(
@@ -82,7 +82,7 @@ async def create_competition(body: CompetitionCreate, current_user: User = Depen
     return comp
 
 
-@router.get("/", response_model=List[CompetitionOut])
+@router.get("", response_model=List[CompetitionOut])
 async def list_competitions():
     return await Competition.find().sort(-Competition.created_at).to_list()
 
