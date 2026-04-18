@@ -38,6 +38,7 @@ async def unified_search(
         results["datasets"] = [
             {"id": str(d.id), "name": d.name, "description": d.description,
              "dataset_type": d.dataset_type.value, "tags": d.tags,
+             "owner_id": str(d.owner_id),
              "star_count": d.star_count, "fork_count": d.fork_count,
              "download_count": d.download_count, "created_at": d.created_at.isoformat()}
             for d in ds
@@ -53,7 +54,8 @@ async def unified_search(
         results["models"] = [
             {"id": str(m.id), "name": m.name, "description": m.description,
              "task_type": m.task_type.value, "framework": m.framework.value,
-             "tags": m.tags, "star_count": m.star_count, "fork_count": m.fork_count,
+             "tags": m.tags, "owner_id": str(m.owner_id), 
+             "star_count": m.star_count, "fork_count": m.fork_count,
              "created_at": m.created_at.isoformat()}
             for m in ms
         ]
@@ -67,7 +69,8 @@ async def unified_search(
         nbs = await Notebook.find(query).sort(-Notebook.star_count if sort == "stars" else -Notebook.created_at).limit(50).to_list()
         results["notebooks"] = [
             {"id": str(n.id), "title": n.title, "description": n.description,
-             "tags": n.tags, "star_count": n.star_count, "fork_count": n.fork_count,
+             "tags": n.tags, "owner_id": str(n.owner_id), 
+             "star_count": n.star_count, "fork_count": n.fork_count,
              "created_at": n.created_at.isoformat()}
             for n in nbs
         ]
@@ -86,6 +89,20 @@ async def unified_search(
              "followers_count": u.followers_count}
             for u in users
         ]
+
+    # Collect user IDs to fetch author names
+    user_ids = set()
+    for d in results["datasets"]: user_ids.add(d["owner_id"])
+    for m in results["models"]: user_ids.add(m["owner_id"])
+    for n in results["notebooks"]: user_ids.add(n["owner_id"])
+    
+    import uuid
+    users = await User.find({"_id": {"$in": [uuid.UUID(uid) for uid in user_ids]}}).to_list() if user_ids else []
+    user_map = {str(u.id): u.username or u.full_name or "Unknown" for u in users}
+
+    for d in results["datasets"]: d["owner_name"] = user_map.get(d["owner_id"], "Unknown")
+    for m in results["models"]: m["owner_name"] = user_map.get(m["owner_id"], "Unknown")
+    for n in results["notebooks"]: n["owner_name"] = user_map.get(n["owner_id"], "Unknown")
 
     return results
 

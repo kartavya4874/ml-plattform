@@ -58,6 +58,9 @@ export default function DataExplorer() {
     const [progress, setProgress] = useState(0)
     const [autoFixing, setAutoFixing] = useState<string | null>(null)
     const [snackMsg, setSnackMsg] = useState<string | null>(null)
+    
+    // Publish Dialog State
+    const [publishDialog, setPublishDialog] = useState<{id: string, name: string, description: string} | null>(null)
 
     useEffect(() => { dispatch(fetchDatasets()) }, [dispatch])
 
@@ -197,8 +200,14 @@ export default function DataExplorer() {
                                             variant="outlined"
                                             onClick={async (e) => {
                                                 e.stopPropagation()
-                                                await api.patch(`/data/datasets/${ds.id}`, { is_public: !ds.is_public })
-                                                dispatch(fetchDatasets())
+                                                if (!ds.is_public) {
+                                                    // Prompt for description
+                                                    setPublishDialog({ id: ds.id, name: ds.name, description: ds.description || '' })
+                                                } else {
+                                                    // Make Private immediately
+                                                    await api.patch(`/data/datasets/${ds.id}`, { is_public: false })
+                                                    dispatch(fetchDatasets())
+                                                }
                                             }}
                                             sx={{ cursor: 'pointer', color: ds.is_public ? '#10B981' : '#6B7280', borderColor: ds.is_public ? '#10B98130' : '#6B728030' }}
                                         />
@@ -268,6 +277,48 @@ export default function DataExplorer() {
                     </Table>
                 </Card>
             )}
+
+            {/* Publish Dialog */}
+            <Dialog open={!!publishDialog} onClose={() => setPublishDialog(null)} maxWidth="sm" fullWidth>
+                <DialogTitle>Make "{publishDialog?.name}" Public</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                        Please provide a short description before making this dataset public. This helps the community understand its purpose.
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        multiline
+                        rows={3}
+                        label="Dataset Description"
+                        placeholder="e.g. A collection of 10,000 traffic images for object detection..."
+                        value={publishDialog?.description || ''}
+                        onChange={(e) => setPublishDialog(prev => prev ? { ...prev, description: e.target.value } : null)}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setPublishDialog(null)}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        disabled={!publishDialog?.description?.trim()}
+                        onClick={async () => {
+                            if (!publishDialog) return
+                            try {
+                                await api.patch(`/data/datasets/${publishDialog.id}`, { 
+                                    is_public: true, 
+                                    description: publishDialog.description 
+                                })
+                                dispatch(fetchDatasets())
+                                setPublishDialog(null)
+                                setSnackMsg("Dataset published successfully!")
+                            } catch (e: any) {
+                                setSnackMsg(e.response?.data?.detail || "Failed to publish")
+                            }
+                        }}
+                    >
+                        Publish to Hub
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             <Snackbar open={!!snackMsg} autoHideDuration={5000} onClose={() => setSnackMsg(null)} message={snackMsg} />
         </Box>

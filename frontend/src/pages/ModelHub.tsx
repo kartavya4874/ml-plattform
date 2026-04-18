@@ -3,7 +3,8 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import {
     Box, Grid, Typography, Card, CardContent, Chip, Button, TextField,
-    FormControl, InputLabel, Select, MenuItem, CircularProgress, IconButton, Tooltip
+    FormControl, InputLabel, Select, MenuItem, CircularProgress, IconButton, Tooltip,
+    Dialog, DialogTitle, DialogContent, DialogActions, Snackbar
 } from '@mui/material'
 import {
     TableChart, Image as ImgIcon, TextFields, Rocket as RocketIcon,
@@ -31,6 +32,8 @@ export default function ModelHub() {
     const { models, loading } = useSelector((s: RootState) => s.models)
     const [search, setSearch] = useState('')
     const [filterStage, setFilterStage] = useState('')
+    const [publishDialog, setPublishDialog] = useState<{id: string, name: string, description: string} | null>(null)
+    const [snackMsg, setSnackMsg] = useState<string | null>(null)
 
     useEffect(() => { dispatch(fetchModels()) }, [dispatch])
 
@@ -126,8 +129,12 @@ export default function ModelHub() {
                                             size="small"
                                             variant="outlined"
                                             onClick={async () => {
-                                                await api.patch(`/models/${model.id}`, { is_public: !model.is_public })
-                                                dispatch(fetchModels())
+                                                if (!model.is_public) {
+                                                    setPublishDialog({ id: model.id, name: model.name, description: model.description || '' })
+                                                } else {
+                                                    await api.patch(`/models/${model.id}`, { is_public: false })
+                                                    dispatch(fetchModels())
+                                                }
                                             }}
                                             sx={{ cursor: 'pointer', mb: 1, color: model.is_public ? '#10B981' : '#6B7280', borderColor: model.is_public ? '#10B98130' : '#6B728030' }}
                                         />
@@ -210,6 +217,50 @@ export default function ModelHub() {
                     })}
                 </Grid>
             )}
+
+            {/* Publish Dialog */}
+            <Dialog open={!!publishDialog} onClose={() => setPublishDialog(null)} maxWidth="sm" fullWidth>
+                <DialogTitle>Make "{publishDialog?.name}" Public</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                        Please provide a short description before publishing. This helps the community understand what your model does and how it was trained.
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        multiline
+                        rows={3}
+                        label="Model Description"
+                        placeholder="e.g. A ResNet50 model fine-tuned on the Stanford Cars dataset..."
+                        value={publishDialog?.description || ''}
+                        onChange={(e) => setPublishDialog(prev => prev ? { ...prev, description: e.target.value } : null)}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setPublishDialog(null)}>Cancel</Button>
+                    <Button
+                        variant="contained"
+                        disabled={!publishDialog?.description?.trim()}
+                        onClick={async () => {
+                            if (!publishDialog) return
+                            try {
+                                await api.patch(`/models/${publishDialog.id}`, { 
+                                    is_public: true, 
+                                    description: publishDialog.description 
+                                })
+                                dispatch(fetchModels())
+                                setPublishDialog(null)
+                                setSnackMsg("Model published successfully!")
+                            } catch (e: any) {
+                                setSnackMsg(e.response?.data?.detail || "Failed to publish")
+                            }
+                        }}
+                    >
+                        Publish Model
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Snackbar open={!!snackMsg} autoHideDuration={5000} onClose={() => setSnackMsg(null)} message={snackMsg} />
         </Box>
     )
 }

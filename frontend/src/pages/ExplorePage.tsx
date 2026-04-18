@@ -90,6 +90,11 @@ export default function ExplorePage() {
                                 <Card sx={{ p: 3, '&:hover': { borderColor: '#444' }, transition: 'border-color 0.2s' }}>
                                     <Typography variant="subtitle1" fontWeight={700}>{d.name}</Typography>
                                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1, minHeight: 36 }}>{d.description || 'No description'}</Typography>
+                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                                        <Typography variant="caption" sx={{ color: 'primary.light', border: '1px solid #1E40AF', background: '#1E3A8A33', px: 1, borderRadius: 1 }}>
+                                            by {d.owner_name || 'Community'}
+                                        </Typography>
+                                    </Box>
                                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                                         <Chip size="small" icon={<StarIcon />} label={d.star_count} />
                                         <Chip size="small" label={d.dataset_type} variant="outlined" />
@@ -112,6 +117,11 @@ export default function ExplorePage() {
                                 <Card sx={{ p: 3, '&:hover': { borderColor: '#444' }, transition: 'border-color 0.2s' }}>
                                     <Typography variant="subtitle1" fontWeight={700}>{m.name}</Typography>
                                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1, minHeight: 36 }}>{m.description || 'No description'}</Typography>
+                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                                        <Typography variant="caption" sx={{ color: 'primary.light', border: '1px solid #1E40AF', background: '#1E3A8A33', px: 1, borderRadius: 1 }}>
+                                            by {m.owner_name || 'Community'}
+                                        </Typography>
+                                    </Box>
                                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                                         <Chip size="small" icon={<StarIcon />} label={m.star_count} />
                                         <Chip size="small" label={m.task_type} variant="outlined" />
@@ -134,6 +144,11 @@ export default function ExplorePage() {
                                 <Card sx={{ p: 3, cursor: 'pointer', '&:hover': { borderColor: '#444' } }} onClick={() => navigate(`/notebooks/${n.id}`)}>
                                     <Typography variant="subtitle1" fontWeight={700}>{n.title}</Typography>
                                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{n.description || 'No description'}</Typography>
+                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1 }}>
+                                        <Typography variant="caption" sx={{ color: 'primary.light', border: '1px solid #1E40AF', background: '#1E3A8A33', px: 1, borderRadius: 1 }}>
+                                            by {n.owner_name || 'Community'}
+                                        </Typography>
+                                    </Box>
                                     <Box sx={{ display: 'flex', gap: 1 }}>
                                         <Chip size="small" icon={<StarIcon />} label={n.star_count} />
                                         {n.tags?.slice(0, 3).map((t: string) => <Chip key={t} size="small" label={t} variant="outlined" />)}

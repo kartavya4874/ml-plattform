@@ -46,6 +46,7 @@ class AdminUserOut(BaseModel):
     full_name: Optional[str]
     username: Optional[str]
     role: str
+    tier: str = "free"
     is_active: bool
     is_verified: bool
     created_at: datetime
@@ -59,7 +60,18 @@ class AdminUserUpdate(BaseModel):
 @router.get("/users", response_model=List[AdminUserOut])
 async def list_all_users(current_user: User = Depends(get_current_user)):
     _require_admin(current_user)
-    return await User.find().sort(-User.created_at).to_list()
+    users = await User.find().sort(-User.created_at).to_list()
+    # Fetch subscriptions to determine tier
+    subs = await Subscription.find().to_list()
+    tier_map = {str(s.user_id): s.tier.value for s in subs}
+    
+    result = []
+    for u in users:
+        u_dict = u.model_dump()
+        u_dict["tier"] = tier_map.get(str(u.id), "free")
+        # Handle datetime serialization cleanly if needed, though Pydantic usually handles it
+        result.append(AdminUserOut(**u_dict))
+    return result
 
 
 @router.patch("/users/{user_id}", response_model=AdminUserOut)
@@ -148,10 +160,12 @@ async def admin_delete_discussion(discussion_id: uuid.UUID, current_user: User =
 @router.patch("/users/{user_id}/subscription")
 async def admin_update_subscription(user_id: uuid.UUID, tier: str, current_user: User = Depends(get_current_user)):
     _require_admin(current_user)
-    sub = await Subscription.find_one(Subscription.user_id == user_id)
-    if not sub:
-        raise HTTPException(404, "Subscription not found")
+    from app.services.quota_service import get_or_create_subscription
+    from app.models.models import SubscriptionStatus
+    
+    sub = await get_or_create_subscription(user_id)
     sub.tier = SubscriptionTier(tier)
+    sub.status = SubscriptionStatus.active
     await sub.save()
     return {"message": f"User subscription updated to {tier}"}
 

@@ -32,6 +32,11 @@ export default function AdminPage() {
         loadData()
     }
 
+    const updateUserTier = async (userId: string, tier: string) => {
+        await api.patch(`/admin/users/${userId}/subscription?tier=${tier}`)
+        loadData()
+    }
+
     const toggleUserActive = async (userId: string, is_active: boolean) => {
         await api.patch(`/admin/users/${userId}`, { is_active })
         loadData()
@@ -103,7 +108,7 @@ export default function AdminPage() {
                     <Table size="small">
                         <TableHead><TableRow>
                             <TableCell>Email</TableCell><TableCell>Name</TableCell><TableCell>Username</TableCell>
-                            <TableCell>Role</TableCell><TableCell>Active</TableCell><TableCell>Actions</TableCell>
+                            <TableCell>Role</TableCell><TableCell>Tier (Sub)</TableCell><TableCell>Active</TableCell><TableCell>Actions</TableCell>
                         </TableRow></TableHead>
                         <TableBody>
                             {users.map(u => (
@@ -112,10 +117,18 @@ export default function AdminPage() {
                                     <TableCell>{u.full_name || '—'}</TableCell>
                                     <TableCell>{u.username || '—'}</TableCell>
                                     <TableCell>
-                                        <Select size="small" value={u.role} onChange={e => updateUserRole(u.id, e.target.value)} sx={{ minWidth: 80 }}>
+                                        <Select size="small" value={u.role} onChange={e => updateUserRole(u.id, e.target.value)} sx={{ minWidth: 90 }}>
                                             <MenuItem value="free">Free</MenuItem>
                                             <MenuItem value="pro">Pro</MenuItem>
                                             <MenuItem value="admin">Admin</MenuItem>
+                                        </Select>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Select size="small" value={u.tier || 'free'} onChange={e => updateUserTier(u.id, e.target.value)} sx={{ minWidth: 100 }}>
+                                            <MenuItem value="free">Free</MenuItem>
+                                            <MenuItem value="pro">Pro</MenuItem>
+                                            <MenuItem value="payg">PayG</MenuItem>
+                                            <MenuItem value="enterprise">Enterprise</MenuItem>
                                         </Select>
                                     </TableCell>
                                     <TableCell>
