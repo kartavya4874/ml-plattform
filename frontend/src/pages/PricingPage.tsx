@@ -160,7 +160,13 @@ function PricingCard({ plan, currentTier, onUpgrade, upgrading }: {
                         id={`upgrade-btn-${plan.tier}`}
                         fullWidth variant="contained"
                         disabled={upgrading}
-                        onClick={() => onUpgrade(plan.tier)}
+                        onClick={() => {
+                            if (!window.localStorage.getItem('token') && !document.cookie.includes('token')) {
+                                window.location.href = '/login'
+                            } else {
+                                onUpgrade(plan.tier)
+                            }
+                        }}
                         sx={{
                             background: `linear-gradient(135deg, ${accent}, ${accent}DD)`,
                             borderRadius: '10px', py: 1.5, fontWeight: 700, fontSize: 15,
@@ -195,10 +201,14 @@ export default function PricingPage() {
     const { pricing, pricingLoading, summary, upgrading } = useSelector((s: RootState) => s.subscription)
     const currentTier = summary?.tier || 'free'
 
+    const token = useSelector((s: RootState) => s.auth.accessToken)
+
     useEffect(() => {
         dispatch(fetchPricing())
-        dispatch(fetchSubscription())
-    }, [dispatch])
+        if (token) {
+            dispatch(fetchSubscription())
+        }
+    }, [dispatch, token])
 
     const handleUpgrade = async (tier: string) => {
         await dispatch(upgradeTier(tier))

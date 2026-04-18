@@ -36,7 +36,10 @@ import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
 import TermsOfServicePage from './pages/TermsOfServicePage'
 import RefundPolicyPage from './pages/RefundPolicyPage'
 import ContactUsPage from './pages/ContactUsPage'
+import ApiReferencePage from './pages/ApiReferencePage'
 import CommandPalette from './components/CommandPalette'
+import ChatWidget from './components/ChatWidget'
+import PublicLayout from './components/PublicLayout'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 
 /** Global hooks wrapper that needs to be inside Router context */
@@ -64,6 +67,7 @@ function RootRoute() {
 
 export default function App() {
   return (
+    <>
     <Routes>
       {/* Public routes */}
       <Route path="/" element={<RootRoute />} />
@@ -71,10 +75,15 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-      <Route path="/privacy" element={<PrivacyPolicyPage />} />
-      <Route path="/terms" element={<TermsOfServicePage />} />
-      <Route path="/refund-policy" element={<RefundPolicyPage />} />
-      <Route path="/contact" element={<ContactUsPage />} />
+      <Route element={<PublicLayout />}>
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<TermsOfServicePage />} />
+        <Route path="/refund-policy" element={<RefundPolicyPage />} />
+        <Route path="/contact" element={<ContactUsPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/docs" element={<DocumentationPage />} />
+        <Route path="/api-docs" element={<ApiReferencePage />} />
+      </Route>
 
       {/* Protected routes — auth guard first, then layout shell */}
       <Route element={<RequireAuth />}>
@@ -101,13 +110,11 @@ export default function App() {
           <Route path="/u/:username" element={<UserProfilePage />} />
 
           {/* Settings */}
-          <Route path="/pricing" element={<PricingPage />} />
           <Route path="/billing" element={<ManageBillingPage />} />
           <Route path="/profile" element={<ManageProfilePage />} />
           <Route path="/api-keys" element={<ApiKeysPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/organizations" element={<OrganizationManagementPage />} />
-          <Route path="/docs" element={<DocumentationPage />} />
 
           <Route path="/model-hub" element={<Navigate to="/models" replace />} />
           <Route path="*" element={<NotFoundPage />} />
@@ -115,5 +122,7 @@ export default function App() {
         </Route>
       </Route>
     </Routes>
+    <ChatWidget />
+    </>
   )
 }

@@ -480,9 +480,9 @@ export default function LandingPage() {
                                 Product
                             </Typography>
                             {[
-                                { label: 'Pricing', path: '/login' },
-                                { label: 'Documentation', path: '/login' },
-                                { label: 'API Reference', path: '/login' },
+                                { label: 'Pricing', path: '/pricing' },
+                                { label: 'Documentation', path: '/docs' },
+                                { label: 'API Reference', path: '/api-docs' },
                             ].map((link) => (
                                 <Typography key={link.label} variant="body2" sx={{
                                     color: theme.palette.text.secondary, mb: 1.5, cursor: 'pointer',
@@ -521,7 +521,7 @@ export default function LandingPage() {
                             </Typography>
                             {[
                                 { label: 'Contact Us', path: '/contact' },
-                                { label: 'Help Center', path: '/login' },
+                                { label: 'Help Center', path: '/docs' },
                             ].map((link) => (
                                 <Typography key={link.label} variant="body2" sx={{
                                     color: theme.palette.text.secondary, mb: 1.5, cursor: 'pointer',

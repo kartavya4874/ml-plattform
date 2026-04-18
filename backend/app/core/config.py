@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE_PRO: int = 2 * 1024 * 1024 * 1024    # 2 GB
     MAX_FILE_SIZE_ENTERPRISE: int = 50 * 1024 * 1024 * 1024  # 50 GB
 
+    # ── AI / LLM ─────────────────────────────────────────────────────────────
+    GEMINI_API_KEY: str = ""
+
     # ── Rate Limits ──────────────────────────────────────────────────────────
     RATE_LIMIT_AUTH: str = "10/minute"
     RATE_LIMIT_API: str = "100/minute"
