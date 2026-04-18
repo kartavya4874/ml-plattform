@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Box, Typography, Card, Grid, Chip, TextField, Tabs, Tab, Avatar, InputAdornment } from '@mui/material'
-import { Search as SearchIcon, Star as StarIcon, TrendingUp as TrendingIcon, Storage as DataIcon, Hub as ModelIcon, Code as CodeIcon, Person as PersonIcon } from '@mui/icons-material'
+import { Box, Typography, Card, Grid, Chip, TextField, Tabs, Tab, Avatar, InputAdornment, IconButton, Tooltip, Snackbar } from '@mui/material'
+import { Search as SearchIcon, Star as StarIcon, TrendingUp as TrendingIcon, Storage as DataIcon, Hub as ModelIcon, Code as CodeIcon, Person as PersonIcon, ContentCopy as ForkIcon } from '@mui/icons-material'
 import { api } from '../api/client'
 
 export default function ExplorePage() {
@@ -14,6 +14,7 @@ export default function ExplorePage() {
     const [tags, setTags] = useState<any[]>([])
     const [selectedTags, setSelectedTags] = useState<string[]>([])
     const [loading, setLoading] = useState(true)
+    const [snackMsg, setSnackMsg] = useState<string | null>(null)
 
     const typeMap = ['', 'dataset', 'model', 'notebook', 'user']
 
@@ -40,6 +41,16 @@ export default function ExplorePage() {
 
     const toggleTag = (tag: string) => {
         setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
+    }
+
+    const handleFork = async (type: string, id: string, e: any) => {
+        e.stopPropagation()
+        try {
+            await api.post(`/social/fork/${type}/${id}`)
+            setSnackMsg(`${type.charAt(0).toUpperCase() + type.slice(1)} cloned to your workspace!`)
+        } catch (err: any) {
+            setSnackMsg(err.response?.data?.detail || `Failed to clone ${type}`)
+        }
     }
 
     return (
@@ -99,6 +110,10 @@ export default function ExplorePage() {
                                         <Chip size="small" icon={<StarIcon />} label={d.star_count} />
                                         <Chip size="small" label={d.dataset_type} variant="outlined" />
                                         {d.tags?.slice(0, 3).map((t: string) => <Chip key={t} size="small" label={t} variant="outlined" />)}
+                                        <Box sx={{ flexGrow: 1 }} />
+                                        <Tooltip title="Save to My Account">
+                                            <IconButton size="small" onClick={(e) => handleFork('dataset', d.id, e)}><ForkIcon fontSize="small" /></IconButton>
+                                        </Tooltip>
                                     </Box>
                                 </Card>
                             </Grid>
@@ -126,6 +141,10 @@ export default function ExplorePage() {
                                         <Chip size="small" icon={<StarIcon />} label={m.star_count} />
                                         <Chip size="small" label={m.task_type} variant="outlined" />
                                         <Chip size="small" label={m.framework} variant="outlined" />
+                                        <Box sx={{ flexGrow: 1 }} />
+                                        <Tooltip title="Save to My Account">
+                                            <IconButton size="small" onClick={(e) => handleFork('model', m.id, e)}><ForkIcon fontSize="small" /></IconButton>
+                                        </Tooltip>
                                     </Box>
                                 </Card>
                             </Grid>
@@ -152,6 +171,10 @@ export default function ExplorePage() {
                                     <Box sx={{ display: 'flex', gap: 1 }}>
                                         <Chip size="small" icon={<StarIcon />} label={n.star_count} />
                                         {n.tags?.slice(0, 3).map((t: string) => <Chip key={t} size="small" label={t} variant="outlined" />)}
+                                        <Box sx={{ flexGrow: 1 }} />
+                                        <Tooltip title="Save to My Account">
+                                            <IconButton size="small" onClick={(e) => handleFork('notebook', n.id, e)}><ForkIcon fontSize="small" /></IconButton>
+                                        </Tooltip>
                                     </Box>
                                 </Card>
                             </Grid>
@@ -191,6 +214,8 @@ export default function ExplorePage() {
                     <Typography color="text.secondary">Try different keywords or remove tag filters</Typography>
                 </Box>
             )}
+            
+            <Snackbar open={!!snackMsg} autoHideDuration={5000} onClose={() => setSnackMsg(null)} message={snackMsg} />
         </Box>
     )
 }

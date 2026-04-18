@@ -227,16 +227,32 @@ export default function PricingPage() {
         <Box className="fade-in" sx={{ maxWidth: 1200, mx: 'auto' }}>
             {/* Header */}
             <Box sx={{ textAlign: 'center', mb: 6, pt: 2 }}>
-                <Chip
-                    label="PRICING"
-                    sx={{
-                        background: 'rgba(99,102,241,0.12)',
-                        color: '#818CF8',
-                        border: '1px solid rgba(99,102,241,0.2)',
-                        fontWeight: 700, letterSpacing: 1.5, fontSize: 11,
-                        mb: 2,
-                    }}
-                />
+                {token && summary && (
+                    <Chip
+                        icon={<StarIcon sx={{ fontSize: 16 }} />}
+                        label={`Current Active Plan: ${currentTier.toUpperCase()}`}
+                        sx={{
+                            background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05))',
+                            color: '#10B981',
+                            border: '1px solid rgba(16,185,129,0.3)',
+                            fontWeight: 800, letterSpacing: 1, fontSize: 13,
+                            mb: 3, py: 2.5, px: 1, borderRadius: '12px'
+                        }}
+                    />
+                )}
+                
+                {!token || !summary ? (
+                    <Chip
+                        label="PRICING"
+                        sx={{
+                            background: 'rgba(99,102,241,0.12)',
+                            color: '#818CF8',
+                            border: '1px solid rgba(99,102,241,0.2)',
+                            fontWeight: 700, letterSpacing: 1.5, fontSize: 11,
+                            mb: 2,
+                        }}
+                    />
+                ) : null}
                 <Typography variant="h3" fontWeight={900} sx={{ mb: 1.5 }}>
                     Choose the perfect plan for{' '}
                     <Box component="span" sx={{

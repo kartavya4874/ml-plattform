@@ -181,8 +181,17 @@ async def fork_resource(resource_type: str, resource_id: uuid.UUID, current_user
             description=original.description, cells=original.cells, tags=original.tags,
         )
         await copy.insert()
+    elif resource_type == "model":
+        copy = MLModel(
+            owner_id=current_user.id, name=f"{original.name} (fork)",
+            description=original.description, task_type=original.task_type,
+            framework=original.framework, tags=original.tags,
+            minio_path=original.minio_path, stage=original.stage,
+            metrics=original.metrics, hyperparameters=original.hyperparameters
+        )
+        await copy.insert()
     else:
-        raise HTTPException(400, "Models cannot be forked directly — fork the training notebook instead")
+        raise HTTPException(400, "Unsupported resource type for forking")
 
     original.fork_count += 1
     await original.save()

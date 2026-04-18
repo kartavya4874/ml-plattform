@@ -5,7 +5,8 @@ import { useDropzone } from 'react-dropzone'
 import {
     Box, Typography, Card, Chip, LinearProgress,
     Table, TableBody, TableCell, TableHead, TableRow,
-    IconButton, Tooltip, Alert, CircularProgress, Snackbar, Button
+    IconButton, Tooltip, Alert, CircularProgress, Snackbar, Button,
+    Dialog, DialogTitle, DialogContent, DialogActions, TextField
 } from '@mui/material'
 import {
     CloudUpload as UploadIcon,
@@ -292,7 +293,7 @@ export default function DataExplorer() {
                         label="Dataset Description"
                         placeholder="e.g. A collection of 10,000 traffic images for object detection..."
                         value={publishDialog?.description || ''}
-                        onChange={(e) => setPublishDialog(prev => prev ? { ...prev, description: e.target.value } : null)}
+                        onChange={(e: any) => setPublishDialog(prev => prev ? { ...prev, description: e.target.value } : null)}
                     />
                 </DialogContent>
                 <DialogActions>
