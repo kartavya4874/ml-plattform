@@ -31,6 +31,7 @@ import ApiKeysPage from './pages/ApiKeysPage'
 import NotFoundPage from './pages/NotFoundPage'
 import LandingPage from './pages/LandingPage'
 import OrganizationManagementPage from './pages/OrganizationManagementPage'
+import JoinOrgPage from './pages/JoinOrgPage'
 import DocumentationPage from './pages/DocumentationPage'
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
 import TermsOfServicePage from './pages/TermsOfServicePage'
@@ -115,6 +116,7 @@ export default function App() {
           <Route path="/api-keys" element={<ApiKeysPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/organizations" element={<OrganizationManagementPage />} />
+          <Route path="/join/:token" element={<JoinOrgPage />} />
 
           <Route path="/model-hub" element={<Navigate to="/models" replace />} />
           <Route path="*" element={<NotFoundPage />} />

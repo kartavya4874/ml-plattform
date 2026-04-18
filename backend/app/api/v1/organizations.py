@@ -46,6 +46,7 @@ class InviteOut(BaseModel):
     id: uuid.UUID
     email: str
     role: str
+    token: str
     accepted: bool
     created_at: datetime
     expires_at: datetime

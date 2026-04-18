@@ -24,7 +24,13 @@ export default function LoginPage() {
         const result = await dispatch(login({ email, password }))
         if (login.fulfilled.match(result)) {
             await dispatch(fetchMe())
-            navigate('/dashboard')
+            const pendingInvite = localStorage.getItem('pending_invite');
+            if (pendingInvite) {
+                localStorage.removeItem('pending_invite');
+                navigate(`/join/${pendingInvite}`);
+            } else {
+                navigate('/dashboard')
+            }
         }
     }
 

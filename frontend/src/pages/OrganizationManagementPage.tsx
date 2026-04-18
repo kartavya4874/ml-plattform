@@ -28,6 +28,7 @@ export const OrganizationManagementPage: React.FC = () => {
   // Invite state
   const [openInvite, setOpenInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [generatedLink, setGeneratedLink] = useState('');
   
   // Domain state
   const [newDomain, setNewDomain] = useState('');
@@ -87,10 +88,13 @@ export const OrganizationManagementPage: React.FC = () => {
 
   const handleInvite = async () => {
     setErrorMSG('');
+    setGeneratedLink('');
     try {
-      await api.post(`/orgs/${selectedOrgSlug}/invite`, { email: inviteEmail, role: 'member' });
+      const res = await api.post(`/orgs/${selectedOrgSlug}/invite`, { email: inviteEmail, role: 'member' });
+      const inviteUrl = `${window.location.origin}/join/${res.data.token}`;
+      setGeneratedLink(inviteUrl);
       setInviteEmail('');
-      setOpenInvite(false);
+      // Do not close so they can copy the link
       fetchOrgDetails(selectedOrgSlug!);
     } catch (e: any) {
       setErrorMSG(e.response?.data?.detail || 'Failed to invite');
@@ -294,24 +298,38 @@ export const OrganizationManagementPage: React.FC = () => {
           </Box>
         </Paper>
 
-        <Dialog open={openInvite} onClose={() => setOpenInvite(false)}>
+        <Dialog open={openInvite} onClose={() => { setOpenInvite(false); setGeneratedLink(''); }}>
           <DialogTitle>Invite Member</DialogTitle>
           <DialogContent>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              They will receive a link to join your organization.
-            </Typography>
-            <TextField
-              autoFocus
-              label="Email Address"
-              fullWidth
-              variant="outlined"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-            />
+            {!generatedLink ? (
+                <>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Generate a link to join your organization.
+                    </Typography>
+                    <TextField
+                    autoFocus
+                    label="Email Address"
+                    fullWidth
+                    variant="outlined"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    />
+                </>
+            ) : (
+                <>
+                    <Alert severity="success" sx={{ mb: 2 }}>Invite created! Send them this join link:</Alert>
+                    <TextField 
+                        fullWidth 
+                        value={generatedLink} 
+                        InputProps={{ readOnly: true }} 
+                        onClick={(e: any) => e.target.select()}
+                    />
+                </>
+            )}
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenInvite(false)}>Cancel</Button>
-            <Button onClick={handleInvite} variant="contained" disabled={!inviteEmail.includes('@')}>Send Invite</Button>
+            <Button onClick={() => { setOpenInvite(false); setGeneratedLink(''); }}>Close</Button>
+            {!generatedLink && <Button onClick={handleInvite} variant="contained" disabled={!inviteEmail.includes('@')}>Generate Link</Button>}
           </DialogActions>
         </Dialog>
       </Container>
