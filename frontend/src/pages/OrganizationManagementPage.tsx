@@ -139,15 +139,32 @@ export const OrganizationManagementPage: React.FC = () => {
     }
   };
 
+  const handleDeleteOrg = async () => {
+    if (!window.confirm("Are you sure you want to completely delete this organization? This action cannot be undone.")) return;
+    try {
+      await api.delete(`/orgs/${selectedOrgSlug}`);
+      setSelectedOrgSlug(null);
+      fetchOrgs();
+      alert("Organization deleted successfully");
+    } catch (e: any) {
+      setErrorMSG(e.response?.data?.detail || 'Failed to delete organization');
+    }
+  };
+
   if (selectedOrgSlug && orgData) {
     return (
       <Container maxWidth="lg" sx={{ py: 6 }}>
-        <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton onClick={() => setSelectedOrgSlug(null)} sx={{ color: 'text.secondary' }}>
-            <ArrowBackIcon />
-          </IconButton>
-          <Typography variant="h4" fontWeight="bold">{orgData.name}</Typography>
-          <Chip label="Enterprise" size="small" color="primary" />
+        <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <IconButton onClick={() => setSelectedOrgSlug(null)} sx={{ color: 'text.secondary' }}>
+              <ArrowBackIcon />
+            </IconButton>
+            <Typography variant="h4" fontWeight="bold">{orgData.name}</Typography>
+            <Chip label="Enterprise" size="small" color="primary" />
+          </Box>
+          <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={handleDeleteOrg}>
+            Delete Organization
+          </Button>
         </Box>
 
         {errorMSG && <Alert severity="error" sx={{ mb: 3 }} onClose={() => setErrorMSG('')}>{errorMSG}</Alert>}

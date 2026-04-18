@@ -13,15 +13,23 @@ export default function AdminPage() {
     const [datasets, setDatasets] = useState<any[]>([])
     const [models, setModels] = useState<any[]>([])
     const [discussions, setDiscussions] = useState<any[]>([])
+    const [organizations, setOrganizations] = useState<any[]>([])
+    const [competitions, setCompetitions] = useState<any[]>([])
     const [auditLogs, setAuditLogs] = useState<any[]>([])
+    
+    // Badge state
+    const [badgeUser, setBadgeUser] = useState('')
+    const [badgeName, setBadgeName] = useState('community_hero')
 
     const loadData = async () => {
         try {
-            const [st, u, d, m, di, al] = await Promise.all([
+            const [st, u, d, m, di, al, orgs, comps] = await Promise.all([
                 api.get('/admin/stats'), api.get('/admin/users'), api.get('/admin/datasets'),
                 api.get('/admin/models'), api.get('/admin/discussions'), api.get('/admin/audit-logs'),
+                api.get('/admin/organizations'), api.get('/admin/competitions')
             ])
             setStats(st.data); setUsers(u.data); setDatasets(d.data); setModels(m.data); setDiscussions(di.data); setAuditLogs(al.data);
+            setOrganizations(orgs.data); setCompetitions(comps.data);
         } catch (e) { console.error(e) }
     }
 
@@ -55,6 +63,27 @@ export default function AdminPage() {
     const deleteDataset = async (id: string) => { await api.delete(`/admin/datasets/${id}`); loadData() }
     const deleteModel = async (id: string) => { await api.delete(`/admin/models/${id}`); loadData() }
     const deleteDiscussion = async (id: string) => { await api.delete(`/admin/discussions/${id}`); loadData() }
+    const deleteOrganization = async (id: string) => { 
+        if(!window.confirm('Force delete this organization and everything inside it?')) return;
+        await api.delete(`/admin/organizations/${id}`); 
+        loadData() 
+    }
+    const deleteCompetition = async (id: string) => { 
+        if(!window.confirm('Force delete this competition?')) return;
+        await api.delete(`/admin/competitions/${id}`); 
+        loadData() 
+    }
+
+    const grantBadge = async () => {
+        if(!badgeUser.trim() || !badgeName.trim()) return;
+        try {
+            await api.post(`/badges/grant`, { target_user_id: badgeUser, badge_name: badgeName })
+            alert('Badge granted successfully')
+            setBadgeUser('')
+        } catch(e:any) {
+            alert(e.response?.data?.detail || e.message)
+        }
+    }
 
     if (user?.role !== 'admin') {
         return (
@@ -99,11 +128,14 @@ export default function AdminPage() {
                 </Grid>
             )}
 
-            <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3, borderBottom: '1px solid #222' }}>
+            <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 3, borderBottom: '1px solid #222' }} variant="scrollable" scrollButtons="auto">
                 <Tab label={`Users (${users.length})`} />
+                <Tab label={`Organizations (${organizations.length})`} />
+                <Tab label={`Competitions (${competitions.length})`} />
                 <Tab label={`Datasets (${datasets.length})`} />
                 <Tab label={`Models (${models.length})`} />
                 <Tab label={`Discussions (${discussions.length})`} />
+                <Tab label="Badges" />
                 <Tab label={`Audit Logs (${auditLogs.length})`} />
             </Tabs>
 
@@ -153,6 +185,48 @@ export default function AdminPage() {
                 <TableContainer component={Card}>
                     <Table size="small">
                         <TableHead><TableRow>
+                            <TableCell>Name</TableCell><TableCell>Slug</TableCell><TableCell>Members</TableCell><TableCell>Created</TableCell><TableCell>Actions</TableCell>
+                        </TableRow></TableHead>
+                        <TableBody>
+                            {organizations.map(o => (
+                                <TableRow key={o.id}>
+                                    <TableCell>{o.name}</TableCell>
+                                    <TableCell><Chip label={o.slug} size="small" variant="outlined" /></TableCell>
+                                    <TableCell>{o.members_count}</TableCell>
+                                    <TableCell>{new Date(o.created_at).toLocaleDateString()}</TableCell>
+                                    <TableCell><IconButton size="small" color="error" onClick={() => deleteOrganization(o.id)}><DeleteIcon fontSize="small" /></IconButton></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            )}
+
+            {tab === 2 && (
+                <TableContainer component={Card}>
+                    <Table size="small">
+                        <TableHead><TableRow>
+                            <TableCell>Title</TableCell><TableCell>Participants</TableCell><TableCell>Status</TableCell><TableCell>Created</TableCell><TableCell>Actions</TableCell>
+                        </TableRow></TableHead>
+                        <TableBody>
+                            {competitions.map(c => (
+                                <TableRow key={c.id}>
+                                    <TableCell>{c.title}</TableCell>
+                                    <TableCell>{c.participant_count}</TableCell>
+                                    <TableCell><Chip size="small" label={c.is_active ? 'Active' : 'Closed'} color={c.is_active ? 'success' : 'default'} /></TableCell>
+                                    <TableCell>{new Date(c.created_at).toLocaleDateString()}</TableCell>
+                                    <TableCell><IconButton size="small" color="error" onClick={() => deleteCompetition(c.id)}><DeleteIcon fontSize="small" /></IconButton></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            )}
+
+            {tab === 3 && (
+                <TableContainer component={Card}>
+                    <Table size="small">
+                        <TableHead><TableRow>
                             <TableCell>Name</TableCell><TableCell>Public</TableCell><TableCell>Status</TableCell><TableCell>Created</TableCell><TableCell>Actions</TableCell>
                         </TableRow></TableHead>
                         <TableBody>
@@ -170,7 +244,7 @@ export default function AdminPage() {
                 </TableContainer>
             )}
 
-            {tab === 2 && (
+            {tab === 4 && (
                 <TableContainer component={Card}>
                     <Table size="small">
                         <TableHead><TableRow>
@@ -191,7 +265,7 @@ export default function AdminPage() {
                 </TableContainer>
             )}
 
-            {tab === 3 && (
+            {tab === 5 && (
                 <TableContainer component={Card}>
                     <Table size="small">
                         <TableHead><TableRow>
@@ -211,7 +285,29 @@ export default function AdminPage() {
                 </TableContainer>
             )}
 
-            {tab === 4 && (
+            {tab === 6 && (
+                <Card sx={{ p: 4, maxWidth: 600, mx: 'auto' }}>
+                    <Typography variant="h6" mb={2}>Manually Grant Badge</Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <TextField 
+                            label="Target User ID" 
+                            variant="outlined" 
+                            value={badgeUser} 
+                            onChange={e => setBadgeUser(e.target.value)} 
+                        />
+                        <Select value={badgeName} onChange={e => setBadgeName(e.target.value)}>
+                            <MenuItem value="early_adopter">Early Adopter</MenuItem>
+                            <MenuItem value="community_hero">Community Hero</MenuItem>
+                            <MenuItem value="trusted_creator">Trusted Creator</MenuItem>
+                            <MenuItem value="pro_subscriber">Pro Subscriber</MenuItem>
+                            <MenuItem value="enterprise_member">Enterprise Member</MenuItem>
+                        </Select>
+                        <Button variant="contained" onClick={grantBadge}>Grant Badge</Button>
+                    </Box>
+                </Card>
+            )}
+
+            {tab === 7 && (
                 <TableContainer component={Card}>
                     <Table size="small">
                         <TableHead><TableRow>
@@ -220,7 +316,10 @@ export default function AdminPage() {
                         <TableBody>
                             {auditLogs.map(l => (
                                 <TableRow key={l.id}>
-                                    <TableCell><Chip size="small" label={l.action} color="secondary" /></TableCell>
+                                    <TableCell>
+                                        <Chip size="small" label={l.action} 
+                                              color={l.action.includes('delete') ? 'error' : l.action.includes('create') ? 'success' : 'primary'} />
+                                    </TableCell>
                                     <TableCell>{l.resource_type} {l.resource_id ? `(${l.resource_id.slice(0, 8)})` : ''}</TableCell>
                                     <TableCell>{l.user_id ? l.user_id.slice(0, 8) : 'System'}</TableCell>
                                     <TableCell>{l.ip_address || '—'}</TableCell>

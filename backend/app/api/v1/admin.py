@@ -180,3 +180,63 @@ async def list_audit_logs(limit: int = 100, current_user: User = Depends(get_cur
              "resource_id": l.resource_id, "ip_address": l.ip_address,
              "created_at": l.created_at.isoformat()} for l in logs]
 
+
+# ── Omni-Admin Overrides ───────────────────────────────────────────────────
+
+@router.get("/organizations", response_model=list)
+async def admin_list_organizations(current_user: User = Depends(get_current_user)):
+    _require_admin(current_user)
+    orgs = await Organization.find().sort(-Organization.created_at).to_list()
+    # fetch members count for each
+    from app.models.models import OrgMembership
+    result = []
+    for o in orgs:
+        members_count = await OrgMembership.find(OrgMembership.org_id == o.id).count()
+        result.append({
+            "id": str(o.id),
+            "name": o.name,
+            "slug": o.slug,
+            "owner_id": str(o.owner_id),
+            "members_count": members_count,
+            "created_at": o.created_at.isoformat()
+        })
+    return result
+
+
+@router.delete("/organizations/{org_id}", status_code=204)
+async def admin_force_delete_organization(org_id: uuid.UUID, current_user: User = Depends(get_current_user)):
+    _require_admin(current_user)
+    org = await Organization.get(org_id)
+    if not org:
+        raise HTTPException(404, "Organization not found")
+    
+    from app.models.models import OrgMembership, OrgInvite
+    await OrgMembership.find(OrgMembership.org_id == org.id).delete()
+    await OrgInvite.find(OrgInvite.org_id == org.id).delete()
+    await org.delete()
+
+
+@router.get("/competitions", response_model=list)
+async def admin_list_competitions(current_user: User = Depends(get_current_user)):
+    _require_admin(current_user)
+    comps = await Competition.find().sort(-Competition.created_at).to_list()
+    return [{
+        "id": str(c.id),
+        "title": c.title,
+        "is_active": c.is_active,
+        "participant_count": c.participant_count,
+        "created_at": c.created_at.isoformat()
+    } for c in comps]
+
+
+@router.delete("/competitions/{comp_id}", status_code=204)
+async def admin_force_delete_competition(comp_id: uuid.UUID, current_user: User = Depends(get_current_user)):
+    _require_admin(current_user)
+    comp = await Competition.get(comp_id)
+    if not comp:
+        raise HTTPException(404, "Competition not found")
+    
+    from app.models.models import Submission
+    await Submission.find(Submission.competition_id == comp.id).delete()
+    await comp.delete()
+

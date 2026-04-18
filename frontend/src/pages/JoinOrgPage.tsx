@@ -9,7 +9,8 @@ import type { RootState } from '../store/store';
 export default function JoinOrgPage() {
     const { token } = useParams<{ token: string }>();
     const navigate = useNavigate();
-    const { token: userToken, isAuthenticated } = useSelector((s: RootState) => s.auth);
+    const { user } = useSelector((s: RootState) => s.auth);
+    const isAuthenticated = !!user;
 
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
     const [message, setMessage] = useState('');

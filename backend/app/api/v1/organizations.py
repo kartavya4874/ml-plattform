@@ -95,6 +95,27 @@ async def get_org(slug: str):
     return org
 
 
+@router.delete("/{slug}", status_code=204)
+async def delete_org(slug: str, current_user: User = Depends(get_current_user)):
+    org = await Organization.find_one(Organization.slug == slug)
+    if not org:
+        raise HTTPException(404, "Organization not found")
+
+    # Only owners can delete
+    membership = await OrgMembership.find_one(
+        OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
+    )
+    if not membership or membership.role != "owner":
+        raise HTTPException(403, "Only the organization owner can delete the organization")
+
+    # Delete all members and invites
+    await OrgMembership.find(OrgMembership.org_id == org.id).delete()
+    await OrgInvite.find(OrgInvite.org_id == org.id).delete()
+    
+    # Finally delete the org itself
+    await org.delete()
+
+
 @router.get("/{slug}/members", response_model=List[MemberOut])
 async def get_org_members(slug: str):
     org = await Organization.find_one(Organization.slug == slug)
