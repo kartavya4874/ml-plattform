@@ -161,6 +161,17 @@ export default function ManageProfilePage() {
                 </Box>
             </Paper>
 
+            <Paper sx={{ p: 4, background: '#111', border: '1px solid #222', borderRadius: 3 }}>
+                <Typography variant="h6" fontWeight={600} mb={3}>Badges & Achievements</Typography>
+                <Typography variant="body2" color="text.secondary" mb={3}>
+                    You can earn badges by completing platform milestones. Choose whether to display them on your public profile.
+                </Typography>
+                <FormControlLabel
+                    control={<Switch checked={badgesPublic} onChange={(e) => setBadgesPublic(e.target.checked)} color="primary" />}
+                    label="Show badges on public profile"
+                />
+            </Paper>
+
             <Paper sx={{ p: 4, background: '#0A0A0A', border: '1px solid #222', borderRadius: 3 }}>
                 <Typography variant="h6" fontWeight={600} mb={3}>Change Password</Typography>
                 {passwordSuccess && <Alert severity="success" sx={{ mb: 3 }}>{passwordSuccess}</Alert>}

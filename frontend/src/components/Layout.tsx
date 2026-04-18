@@ -26,6 +26,7 @@ import {
     VpnKey as VpnKeyIcon,
     DarkMode as DarkModeIcon,
     LightMode as LightModeIcon,
+    Business as BusinessIcon,
 } from '@mui/icons-material'
 import { logout } from '../store/authSlice'
 import { fetchSubscription } from '../store/subscriptionSlice'
@@ -43,6 +44,7 @@ const navItems = [
     { label: 'Pricing', icon: <PricingIcon />, path: '/pricing' },
     { label: 'Billing', icon: <ReceiptIcon />, path: '/billing' },
     { label: 'API Keys', icon: <VpnKeyIcon />, path: '/api-keys' },
+    { label: 'Organizations', icon: <BusinessIcon />, path: '/organizations' },
     { label: 'Profile', icon: <PersonIcon />, path: '/profile' },
 ]
 

@@ -28,13 +28,17 @@ export default function AdminPage() {
     useEffect(() => { loadData() }, [])
 
     const updateUserRole = async (userId: string, role: string) => {
-        await api.patch(`/admin/users/${userId}`, { role })
-        loadData()
+        try {
+            await api.patch(`/admin/users/${userId}`, { role })
+            loadData()
+        } catch (e: any) { alert(e.response?.data?.detail || e.message) }
     }
 
     const updateUserTier = async (userId: string, tier: string) => {
-        await api.patch(`/admin/users/${userId}/subscription?tier=${tier}`)
-        loadData()
+        try {
+            await api.patch(`/admin/users/${userId}/subscription?tier=${tier}`)
+            loadData()
+        } catch (e: any) { alert(e.response?.data?.detail || e.message) }
     }
 
     const toggleUserActive = async (userId: string, is_active: boolean) => {
