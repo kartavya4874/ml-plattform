@@ -173,8 +173,8 @@ export default function ContactUsPage() {
                         <ContactCard
                             icon={<LocationIcon />}
                             title="Registered Address"
-                            detail="House Number 453, HUDA, Panipat"
-                            subDetail="Haryana, India"
+                            detail="House number 453, Sector 25 part 2 huda panipat"
+                            subDetail="haryana, 132103"
                             color="#F59E0B"
                         />
                     </Grid>

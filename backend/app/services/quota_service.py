@@ -47,7 +47,7 @@ PRICING_INFO = [
         "tier": "free",
         "name": "Free",
         "price_monthly": 0,
-        "price_label": "$0",
+        "price_label": "₹0",
         "description": "Perfect for exploring the platform and building your first models.",
         "limits": {
             "datasets": 3,
@@ -72,8 +72,8 @@ PRICING_INFO = [
     {
         "tier": "pro",
         "name": "Pro",
-        "price_monthly": 29,
-        "price_label": "$29/mo",
+        "price_monthly": 2499,
+        "price_label": "₹2,499/mo",
         "description": "For professionals and teams building production ML pipelines.",
         "limits": {
             "datasets": 25,
@@ -100,8 +100,8 @@ PRICING_INFO = [
     {
         "tier": "enterprise",
         "name": "Enterprise",
-        "price_monthly": 99,
-        "price_label": "$99/mo",
+        "price_monthly": 7999,
+        "price_label": "₹7,999/mo",
         "description": "Unlimited scale for large teams and enterprise deployments.",
         "limits": {
             "datasets": 999_999,

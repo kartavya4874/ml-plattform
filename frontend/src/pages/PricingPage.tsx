@@ -118,7 +118,7 @@ function PricingCard({ plan, currentTier, onUpgrade, upgrading }: {
                             background: `linear-gradient(135deg, ${accent}, ${accent}CC)`,
                             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
                         }}>
-                            {plan.price_monthly === 0 ? 'Free' : `$${plan.price_monthly}`}
+                            {plan.price_monthly === 0 ? 'Free' : `₹${plan.price_monthly}`}
                         </Typography>
                         {plan.price_monthly > 0 && (
                             <Typography variant="body2" sx={{ color: 'text.secondary' }}>/month</Typography>

@@ -150,8 +150,8 @@ async def get_invoices(
         mock_inv = Invoice(
             user_id=current_user.id,
             subscription_id=sub.id,
-            amount_due=49.0 if sub.tier == SubscriptionTier.pro else 199.0,
-            amount_paid=49.0 if sub.tier == SubscriptionTier.pro else 199.0,
+            amount_due=2499.0 if sub.tier == SubscriptionTier.pro else 7999.0,
+            amount_paid=2499.0 if sub.tier == SubscriptionTier.pro else 7999.0,
             status="paid",
             billing_reason="subscription_cycle"
         )
@@ -246,7 +246,7 @@ async def download_invoice(
 
     table_data = [
         ["Description", "Period", "Qty", "Amount"],
-        [f"Parametrix AI {tier_name} Plan", f"{period_start} – {period_end}", "1", f"${invoice.amount_due:.2f}"],
+        [f"Parametrix AI {tier_name} Plan", f"{period_start} – {period_end}", "1", f"₹{invoice.amount_due:.2f}"],
     ]
 
     col_widths = [220, 160, 50, 85]
@@ -285,12 +285,12 @@ async def download_invoice(
     c.setFillColor(MUTED)
     c.drawRightString(w - 130, totals_y, "Subtotal:")
     c.setFillColor(HexColor("#222222"))
-    c.drawRightString(w - 40, totals_y, f"${invoice.amount_due:.2f}")
+    c.drawRightString(w - 40, totals_y, f"₹{invoice.amount_due:.2f}")
 
     c.setFillColor(MUTED)
     c.drawRightString(w - 130, totals_y - 18, "Tax (0%):")
     c.setFillColor(HexColor("#222222"))
-    c.drawRightString(w - 40, totals_y - 18, "$0.00")
+    c.drawRightString(w - 40, totals_y - 18, "₹0.00")
 
     c.setStrokeColor(HexColor("#CCCCCC"))
     c.line(w - 250, totals_y - 30, w - 40, totals_y - 30)
@@ -298,7 +298,7 @@ async def download_invoice(
     c.setFont("Helvetica-Bold", 13)
     c.setFillColor(BLACK)
     c.drawRightString(w - 130, totals_y - 50, "Total Paid:")
-    c.drawRightString(w - 40, totals_y - 50, f"${invoice.amount_paid:.2f}")
+    c.drawRightString(w - 40, totals_y - 50, f"₹{invoice.amount_paid:.2f}")
 
     # ── Payment badge ────────────────────────────────────────────
     badge_y = totals_y - 50
