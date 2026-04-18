@@ -7,7 +7,8 @@ from fastapi import HTTPException
 
 from app.models.models import (
     Subscription, UsageRecord, UsageMeteredEvent,
-    SubscriptionTier, SubscriptionStatus, User
+    SubscriptionTier, SubscriptionStatus, User,
+    OrgMembership, Organization
 )
 
 
@@ -240,8 +241,33 @@ def get_tier_limits(tier: SubscriptionTier) -> dict:
 
 
 async def get_user_tier(user_id: uuid.UUID) -> SubscriptionTier:
-    """Get the user's active subscription tier."""
+    """Get the user's active subscription tier, inheriting from org if applicable."""
     sub = await get_or_create_subscription(user_id)
+    
+    # If user has their own premium subscription, use it
+    if sub.status in (SubscriptionStatus.active, SubscriptionStatus.trialing) and sub.tier in (SubscriptionTier.enterprise, SubscriptionTier.payg, SubscriptionTier.pro):
+        return sub.tier
+
+    # Check if user belongs to an organization with a premium tier
+    memberships = await OrgMembership.find(OrgMembership.user_id == user_id).to_list()
+    best_tier = SubscriptionTier.free
+
+    for m in memberships:
+        org = await Organization.get(m.org_id)
+        if org:
+            # Check the org owner's subscription
+            org_owner_sub = await get_or_create_subscription(org.owner_id)
+            if org_owner_sub.status in (SubscriptionStatus.active, SubscriptionStatus.trialing):
+                if org_owner_sub.tier == SubscriptionTier.enterprise:
+                    return SubscriptionTier.enterprise  # Highest possible
+                elif org_owner_sub.tier == SubscriptionTier.payg:
+                    best_tier = SubscriptionTier.payg
+                elif org_owner_sub.tier == SubscriptionTier.pro and best_tier == SubscriptionTier.free:
+                    best_tier = SubscriptionTier.pro
+
+    if best_tier != SubscriptionTier.free:
+        return best_tier
+
     if sub.status not in (SubscriptionStatus.active, SubscriptionStatus.trialing):
         return SubscriptionTier.free
     return sub.tier

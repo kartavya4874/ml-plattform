@@ -73,10 +73,10 @@ export default function Layout() {
     const currentTier = summary?.tier || user?.role || 'free'
     const tierColor = tierColors[currentTier] || '#6366F1'
 
-    // Notification state
     const [unreadCount, setUnreadCount] = useState(0)
     const [notifications, setNotifications] = useState<any[]>([])
     const [notifAnchor, setNotifAnchor] = useState<HTMLElement | null>(null)
+    const [whitelabel, setWhitelabel] = useState<any>(null)
 
     const fetchNotifs = useCallback(async () => {
         try {
@@ -92,6 +92,22 @@ export default function Layout() {
     useEffect(() => {
         dispatch(fetchSubscription())
         fetchNotifs()
+
+        // Fetch User's Organizations for White-label Check
+        api.get('/orgs/').then(res => {
+            if (res.data && res.data.length > 0) {
+                // Find first org with a valid whitelabel_config
+                const orgWithBrand = res.data.find((o: any) => o.whitelabel_config?.brand_name || o.whitelabel_config?.logo_url)
+                if (orgWithBrand) {
+                    setWhitelabel(orgWithBrand.whitelabel_config)
+                    document.documentElement.style.setProperty('--primary', orgWithBrand.whitelabel_config.primary_color || '#6366F1')
+                    if (orgWithBrand.whitelabel_config.brand_name) {
+                        document.title = orgWithBrand.whitelabel_config.brand_name;
+                    }
+                }
+            }
+        }).catch(() => {})
+
         const interval = setInterval(fetchNotifs, 30000) // poll every 30s
         return () => clearInterval(interval)
     }, [dispatch, fetchNotifs])
@@ -126,12 +142,19 @@ export default function Layout() {
                     <Box sx={{
                         width: 36, height: 36, borderRadius: '10px',
                         background: '#FAFAFA',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        overflow: 'hidden'
                     }}>
-                        <LogoIcon sx={{ color: '#000', fontSize: 18 }} />
+                        {whitelabel?.logo_url ? (
+                            <img src={whitelabel.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                            <LogoIcon sx={{ color: '#000', fontSize: 18 }} />
+                        )}
                     </Box>
                     <Box>
-                        <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2 }}>Parametrix AI</Typography>
+                        <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2 }}>
+                            {whitelabel?.brand_name || 'Parametrix AI'}
+                        </Typography>
                         <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 10 }}>v1.0</Typography>
                     </Box>
                 </Box>
