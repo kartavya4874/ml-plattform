@@ -64,7 +64,7 @@ export default function ManageBillingPage() {
                 </Typography>
             </Box>
 
-            <Paper sx={{ p: 4, background: '#0A0A0A', border: '1px solid #222', borderRadius: 3 }}>
+            <Paper sx={{ p: 4, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 3 }}>
                 <Typography variant="h6" fontWeight={600} mb={3}>Current Plan Overview</Typography>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, background: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
                     <Box>
@@ -87,7 +87,7 @@ export default function ManageBillingPage() {
                 </Box>
             </Paper>
 
-            <Paper sx={{ p: 4, background: '#0A0A0A', border: '1px solid #222', borderRadius: 3 }}>
+            <Paper sx={{ p: 4, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 3 }}>
                 <Typography variant="h6" fontWeight={600} mb={3}>Billing History</Typography>
                 <TableContainer>
                     <Table>
@@ -110,7 +110,7 @@ export default function ManageBillingPage() {
                             {invoices.map((inv) => (
                                 <TableRow key={inv.id}>
                                     <TableCell>{new Date(inv.created_at).toLocaleDateString()}</TableCell>
-                                    <TableCell>${inv.amount_paid.toFixed(2)}</TableCell>
+                                    <TableCell>₹{inv.amount_paid.toFixed(2)}</TableCell>
                                     <TableCell>
                                         <Chip label={inv.status} size="small" color={inv.status === 'paid' ? 'success' : 'default'} />
                                     </TableCell>

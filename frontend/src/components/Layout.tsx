@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import {
     Box, Drawer, AppBar, Toolbar, Typography, IconButton,
     Avatar, Tooltip, Badge, Chip, Popover, List, ListItemButton,
-    ListItemText, ListItemIcon, Button, Divider
+    ListItemText, ListItemIcon, Button, Divider, useMediaQuery, useTheme
 } from '@mui/material'
 import {
     Dashboard as DashboardIcon,
@@ -27,6 +27,7 @@ import {
     DarkMode as DarkModeIcon,
     LightMode as LightModeIcon,
     Business as BusinessIcon,
+    Menu as MenuIcon,
 } from '@mui/icons-material'
 import { logout } from '../store/authSlice'
 import { fetchSubscription } from '../store/subscriptionSlice'
@@ -128,15 +129,29 @@ export default function Layout() {
         fetchNotifs()
     }
 
+    const muiTheme = useTheme()
+    const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'))
+    const [mobileOpen, setMobileOpen] = useState(false)
+
+    const handleDrawerToggle = () => setMobileOpen(!mobileOpen)
+
+    // Close mobile drawer on navigation
+    useEffect(() => {
+        if (isMobile) setMobileOpen(false)
+    }, [location.pathname, isMobile])
+
     return (
         <Box sx={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
             {/* Sidebar */}
             <Drawer
-                variant="permanent"
+                variant={isMobile ? 'temporary' : 'permanent'}
+                open={isMobile ? mobileOpen : true}
+                onClose={handleDrawerToggle}
+                ModalProps={{ keepMounted: true }}
                 sx={{
-                    width: DRAWER_WIDTH,
+                    width: isMobile ? 0 : DRAWER_WIDTH,
                     flexShrink: 0,
-                    '& .MuiDrawer-paper': { width: DRAWER_WIDTH, borderRight: '1px solid rgba(255,255,255,0.06)' },
+                    '& .MuiDrawer-paper': { width: DRAWER_WIDTH, borderRight: '1px solid var(--border)' },
                 }}
             >
                 {/* Logo */}
@@ -173,6 +188,9 @@ export default function Layout() {
                                 key={item.path}
                                 className={`nav-item ${active ? 'active' : ''}`}
                                 onClick={() => navigate(item.path)}
+                                onKeyDown={(e: any) => e.key === 'Enter' && navigate(item.path)}
+                                role="button"
+                                tabIndex={0}
                                 sx={{ mb: 0.5 }}
                             >
                                 <Box sx={{ color: active ? 'primary.light' : 'text.secondary', display: 'flex' }}>
@@ -198,6 +216,9 @@ export default function Layout() {
                                 key={item.path}
                                 className={`nav-item ${active ? 'active' : ''}`}
                                 onClick={() => navigate(item.path)}
+                                onKeyDown={(e: any) => e.key === 'Enter' && navigate(item.path)}
+                                role="button"
+                                tabIndex={0}
                                 sx={{ mb: 0.5 }}
                             >
                                 <Box sx={{ color: active ? 'primary.light' : 'text.secondary', display: 'flex' }}>
@@ -230,7 +251,7 @@ export default function Layout() {
                 )}
 
                 {/* User Profile */}
-                <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <Box sx={{ p: 2, borderTop: '1px solid var(--border)' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                         <Avatar src={user?.avatar_url || undefined} sx={{ width: 36, height: 36, background: '#FAFAFA', color: '#000', fontSize: 14 }}>
                             {user?.email?.[0]?.toUpperCase() || 'U'}
@@ -260,7 +281,7 @@ export default function Layout() {
                         </Tooltip>
                     </Box>
                     <Typography variant="caption" sx={{ display: 'block', mt: 2, textAlign: 'center', color: 'text.secondary', fontSize: '10px', opacity: 0.6 }}>
-                        Made with ❤️ by Kartavya
+                        Made with ❤️ by Kartavya & Maninder
                     </Typography>
                 </Box>
             </Drawer>
@@ -268,7 +289,20 @@ export default function Layout() {
             {/* Main Content */}
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <AppBar position="static" elevation={0}>
-                    <Toolbar sx={{ justifyContent: 'flex-end', gap: 1 }}>
+                    <Toolbar sx={{ justifyContent: 'space-between', gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            {isMobile && (
+                                <IconButton
+                                    id="mobile-menu-toggle"
+                                    onClick={handleDrawerToggle}
+                                    sx={{ color: 'text.secondary', mr: 1 }}
+                                    aria-label="Open navigation menu"
+                                >
+                                    <MenuIcon />
+                                </IconButton>
+                            )}
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Tooltip title={themeMode === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
                             <IconButton
                                 id="theme-toggle"
@@ -291,7 +325,7 @@ export default function Layout() {
                             onClose={() => setNotifAnchor(null)}
                             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                            PaperProps={{ sx: { width: 360, maxHeight: 420, background: '#1A1A24', border: '1px solid rgba(255,255,255,0.08)' } }}
+                            PaperProps={{ sx: { width: 360, maxHeight: 420, background: 'var(--surface)', border: '1px solid var(--border)' } }}
                         >
                             <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Typography variant="subtitle2" fontWeight={700}>Notifications</Typography>
@@ -299,7 +333,7 @@ export default function Layout() {
                                     <Button size="small" onClick={handleMarkAllRead} sx={{ fontSize: 11 }}>Mark all read</Button>
                                 )}
                             </Box>
-                            <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)' }} />
+                            <Divider sx={{ borderColor: 'var(--border)' }} />
                             {notifications.length === 0 ? (
                                 <Box sx={{ p: 3, textAlign: 'center' }}>
                                     <Typography variant="body2" color="text.secondary">No notifications yet</Typography>
@@ -332,6 +366,7 @@ export default function Layout() {
                                 </List>
                             )}
                         </Popover>
+                        </Box>
                     </Toolbar>
                 </AppBar>
 

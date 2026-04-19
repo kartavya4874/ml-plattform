@@ -40,6 +40,8 @@ import ContactUsPage from './pages/ContactUsPage'
 import ApiReferencePage from './pages/ApiReferencePage'
 import CommandPalette from './components/CommandPalette'
 import ChatWidget from './components/ChatWidget'
+import ErrorBoundary from './components/ErrorBoundary'
+import SessionExpiredModal from './components/SessionExpiredModal'
 import PublicLayout from './components/PublicLayout'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 
@@ -49,7 +51,10 @@ function GlobalHooks() {
   return (
     <>
       <CommandPalette />
-      <Outlet />
+      <SessionExpiredModal />
+      <ErrorBoundary>
+        <Outlet />
+      </ErrorBoundary>
     </>
   )
 }

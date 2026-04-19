@@ -400,7 +400,7 @@ async def _run_training_background(
         try:
             from app.api.v1.notifications import create_notification
             await create_notification(
-                user_id=uuid.UUID(user_id),
+                user_id=uuid.UUID(owner_id),
                 type="training_complete",
                 title="Training Complete! 🎉",
                 message=f"Your {task_type} model finished training. Best: {metrics.get('best_model', 'N/A')}",
@@ -425,7 +425,7 @@ async def _run_training_background(
         try:
             from app.api.v1.notifications import create_notification
             await create_notification(
-                user_id=uuid.UUID(user_id),
+                user_id=uuid.UUID(owner_id),
                 type="training_failed",
                 title="Training Failed ❌",
                 message=f"Your {task_type} training job encountered an error.",

@@ -182,12 +182,15 @@ async def fork_resource(resource_type: str, resource_id: uuid.UUID, current_user
         )
         await copy.insert()
     elif resource_type == "model":
+        import re, time as _time
+        fork_slug = re.sub(r'[^a-z0-9]+', '-', f"{original.name}-fork-{int(_time.time())}".lower()).strip('-')
         copy = MLModel(
             owner_id=current_user.id, name=f"{original.name} (fork)",
             description=original.description, task_type=original.task_type,
             framework=original.framework, tags=original.tags,
-            minio_path=original.minio_path, stage=original.stage,
-            metrics=original.metrics, hyperparameters=original.hyperparameters
+            artifact_path=original.artifact_path, stage=original.stage,
+            metrics=original.metrics, training_job_id=original.training_job_id,
+            slug=fork_slug,
         )
         await copy.insert()
     else:

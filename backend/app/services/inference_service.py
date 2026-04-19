@@ -72,38 +72,70 @@ class InferenceService:
             raise ValueError(f"Unknown task type: {task}")
 
     async def _predict_tabular(self, model_obj: MLModel, inputs: dict) -> dict:
-        """Predict using a sklearn model. Inputs are {feature_name: value}."""
-        model = await self._load_artifact(model_obj)
+        """Predict using a tabular pipeline. Inputs are {feature_name: value}."""
+        artifact = await self._load_artifact(model_obj)
         loop = asyncio.get_event_loop()
 
         def _run():
             # Build feature dataframe from inputs
             df = pd.DataFrame([inputs])
 
-            # Ensure numeric columns are numeric
-            for col in df.columns:
+            # The artifact is either a dict (pipeline from FLAML trainer) or a raw sklearn model
+            if isinstance(artifact, dict) and "preprocessor" in artifact:
+                preprocessor = artifact["preprocessor"]
+                automl = artifact["automl"]
+                feature_names = artifact.get("feature_names", [])
+
+                # Reorder columns to match training order, fill missing with NaN
+                for col in feature_names:
+                    if col not in df.columns:
+                        df[col] = np.nan
+                df = df[feature_names]
+
+                # Apply preprocessing (impute + scale + encode)
+                df_transformed = preprocessor.transform(df)
+
+                pred = automl.predict(df_transformed)[0]
+                result: dict[str, Any] = {
+                    "prediction": float(pred) if isinstance(pred, (int, float, np.integer, np.floating)) else str(pred),
+                }
+
+                # Try to get probabilities for classification
                 try:
-                    df[col] = pd.to_numeric(df[col])
-                except (ValueError, TypeError):
-                    # Encode categorical as integer codes
-                    df[col] = df[col].astype("category").cat.codes
+                    if hasattr(automl, "predict_proba"):
+                        proba = automl.predict_proba(df_transformed)[0]
+                        classes = list(map(str, automl.classes_))
+                        result["confidence"] = round(float(max(proba)), 4)
+                        result["class_probabilities"] = {c: round(float(p), 4) for c, p in zip(classes, proba)}
+                except Exception:
+                    pass
 
-            pred = model.predict(df)[0]
-            result: dict[str, Any] = {
-                "prediction": float(pred) if isinstance(pred, (int, float, np.integer, np.floating)) else str(pred),
-            }
+                return result
+            else:
+                # Fallback: raw sklearn model (legacy artifacts)
+                model = artifact
 
-            # Try to get probabilities for classification
-            try:
-                if hasattr(model, "predict_proba"):
-                    proba = model.predict_proba(df)[0]
-                    classes = list(map(str, model.classes_))
-                    result["confidence"] = round(float(max(proba)), 4)
-                    result["class_probabilities"] = {c: round(float(p), 4) for c, p in zip(classes, proba)}
-            except Exception:
-                pass
+                for col in df.columns:
+                    try:
+                        df[col] = pd.to_numeric(df[col])
+                    except (ValueError, TypeError):
+                        df[col] = df[col].astype("category").cat.codes
 
-            return result
+                pred = model.predict(df)[0]
+                result: dict[str, Any] = {
+                    "prediction": float(pred) if isinstance(pred, (int, float, np.integer, np.floating)) else str(pred),
+                }
+
+                try:
+                    if hasattr(model, "predict_proba"):
+                        proba = model.predict_proba(df)[0]
+                        classes = list(map(str, model.classes_))
+                        result["confidence"] = round(float(max(proba)), 4)
+                        result["class_probabilities"] = {c: round(float(p), 4) for c, p in zip(classes, proba)}
+                except Exception:
+                    pass
+
+                return result
 
         return await loop.run_in_executor(None, _run)
 

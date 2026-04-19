@@ -1,7 +1,6 @@
 """Model registry routes — /api/v1/models/"""
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi import APIRouter, Depends, HTTPException
 
 from app.models.models import User, MLModel, ModelStage
 from app.schemas.schemas import ModelOut, ModelUpdate

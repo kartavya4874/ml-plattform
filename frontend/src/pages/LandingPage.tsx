@@ -537,7 +537,7 @@ export default function LandingPage() {
                     {/* Bottom Bar */}
                     <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, pt: 4, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
                         <Typography variant="body2" sx={{ color: theme.palette.text.secondary, fontWeight: 500 }}>
-                            © {new Date().getFullYear()} Parametrix AI. All rights reserved. Made with ❤️ by Kartavya.
+                            © {new Date().getFullYear()} Parametrix AI. All rights reserved. Made with ❤️ by Kartavya & Maninder.
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 3 }}>
                             {[

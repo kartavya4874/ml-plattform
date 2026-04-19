@@ -82,7 +82,7 @@ function UsageGauge({ label, current, limit, color }: { label: string; current: 
                     value={100}
                     size={72}
                     thickness={4}
-                    sx={{ color: 'rgba(255,255,255,0.06)', position: 'absolute' }}
+                    sx={{ color: 'var(--border)', position: 'absolute' }}
                 />
                 <CircularProgress
                     variant="determinate"

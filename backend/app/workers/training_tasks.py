@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from celery import Task
 from app.workers.celery_app import celery_app
 from app.core.config import settings
+import redis as sync_redis
 import structlog
 
 log = structlog.get_logger()

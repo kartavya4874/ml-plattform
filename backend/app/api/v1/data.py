@@ -267,6 +267,7 @@ async def get_dataset_profile(
 async def download_file(
     bucket: str, 
     object_name: str, 
+    current_user: User = Depends(get_current_user),
     storage=Depends(StorageService.get_instance)
 ):
     """Generic endpoint to download files from Local and Mongo backends."""

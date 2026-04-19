@@ -32,9 +32,11 @@ class UserRegister(BaseModel):
             return v.lower()
         return v
 
-    @field_validator("password")
+    @field_validator("password", mode="before")
     @classmethod
     def validate_password(cls, v: str) -> str:
+        if isinstance(v, str):
+            v = v.strip()
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters")
         return v
@@ -98,6 +100,14 @@ class UserLogin(BaseModel):
             return v.lower()
         return v
 
+    @field_validator("password", mode="before")
+    @classmethod
+    def strip_password(cls, v: Any) -> Any:
+        """Strip leading/trailing whitespace — mobile keyboards often add trailing spaces."""
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -158,6 +168,7 @@ class DatasetDetail(DatasetOut):
 # ── Training Job ───────────────────────────────────────────────────────────────
 
 class TrainingConfig(BaseModel):
+    model_config = {"protected_namespaces": ()}
     time_limit_seconds: int = 300
     metric: str = "auto"
     presets: str = "medium_quality"

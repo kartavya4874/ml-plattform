@@ -79,6 +79,7 @@ api.interceptors.response.use(
                 return axios(original)
             } catch (refErr) {
                 processQueue(refErr)
+                window.dispatchEvent(new CustomEvent('session-expired'))
                 store.dispatch({ type: 'auth/logout' })
                 return Promise.reject(refErr)
             } finally {

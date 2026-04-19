@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import {
@@ -9,20 +9,40 @@ import {
     AutoAwesome as LogoIcon
 } from '@mui/icons-material'
 import { login, fetchMe } from '../store/authSlice'
+import { useToast } from '../components/ToastProvider'
 import type { AppDispatch, RootState } from '../store/store'
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function LoginPage() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [showPwd, setShowPwd] = useState(false)
+    const [touched, setTouched] = useState({ email: false, password: false })
     const dispatch = useDispatch<AppDispatch>()
     const navigate = useNavigate()
     const { loading, error } = useSelector((s: RootState) => s.auth)
+    const { success: successToast, error: errorToast } = useToast()
+
+    const emailError = useMemo(() => {
+        if (!touched.email || !email) return ''
+        return EMAIL_REGEX.test(email) ? '' : 'Enter a valid email address'
+    }, [email, touched.email])
+
+    const passwordError = useMemo(() => {
+        if (!touched.password || !password) return ''
+        return password.length >= 8 ? '' : 'Password must be at least 8 characters'
+    }, [password, touched.password])
+
+    const isValid = email && password.length >= 8 && EMAIL_REGEX.test(email)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        setTouched({ email: true, password: true })
+        if (!isValid) return
         const result = await dispatch(login({ email, password }))
         if (login.fulfilled.match(result)) {
+            successToast('Welcome back to Parametrix AI!')
             await dispatch(fetchMe())
             const pendingInvite = localStorage.getItem('pending_invite');
             if (pendingInvite) {
@@ -51,8 +71,9 @@ export default function LoginPage() {
                 p: 4,
                 position: 'relative',
                 boxShadow: 'none',
-                className: 'fade-in'
-            }}>
+            }}
+                className="fade-in"
+            >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 4 }}>
                     <Box sx={{
                         width: 44, height: 44, borderRadius: '12px',
@@ -83,6 +104,9 @@ export default function LoginPage() {
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        onBlur={() => setTouched(t => ({ ...t, email: true }))}
+                        error={!!emailError}
+                        helperText={emailError}
                         required
                         fullWidth
                         InputProps={{
@@ -95,13 +119,16 @@ export default function LoginPage() {
                         type={showPwd ? 'text' : 'password'}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        onBlur={() => setTouched(t => ({ ...t, password: true }))}
+                        error={!!passwordError}
+                        helperText={passwordError}
                         required
                         fullWidth
                         InputProps={{
                             startAdornment: <InputAdornment position="start"><LockIcon sx={{ color: 'text.secondary', fontSize: 18 }} /></InputAdornment>,
                             endAdornment: (
                                 <InputAdornment position="end">
-                                    <IconButton size="small" onClick={() => setShowPwd(!showPwd)} edge="end">
+                                    <IconButton size="small" onClick={() => setShowPwd(!showPwd)} edge="end" aria-label="Toggle password visibility">
                                         {showPwd ? <VisibilityOff /> : <Visibility />}
                                     </IconButton>
                                 </InputAdornment>
@@ -118,7 +145,7 @@ export default function LoginPage() {
                         type="submit"
                         variant="contained"
                         fullWidth
-                        disabled={loading}
+                        disabled={loading || (!isValid && touched.email && touched.password)}
                         sx={{ py: 1.5, mt: 1 }}
                     >
                         {loading ? 'Signing in...' : 'Sign In'}

@@ -7,7 +7,7 @@ from app.models.models import User, SubscriptionTier, SubscriptionStatus, Invoic
 from app.schemas.schemas import (
     SubscriptionOut, UsageOut, PricingTierInfo, SubscriptionSummary, TierLimitInfo, InvoiceOut
 )
-from app.api.v1.auth import get_current_user
+from app.api.v1.auth import get_current_user, get_verified_user
 from app.services.quota_service import (
     get_or_create_subscription, get_or_create_usage,
     get_usage_summary, get_user_tier, get_tier_limits,

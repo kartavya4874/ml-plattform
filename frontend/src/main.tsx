@@ -8,6 +8,7 @@ import { store } from './store/store'
 import { getTheme } from './theme'
 import './index.css'
 import { injectStore } from './api/client'
+import { ToastProvider } from './components/ToastProvider'
 import type { RootState } from './store/store'
 
 injectStore(store)
@@ -23,7 +24,9 @@ function ThemedApp() {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
-            <App />
+            <ToastProvider>
+                <App />
+            </ToastProvider>
         </ThemeProvider>
     )
 }
