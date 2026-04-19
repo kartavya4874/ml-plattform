@@ -76,6 +76,33 @@ async def get_current_user(
     return user
 
 
+async def _auto_accept_invites(user: User):
+    from app.models.models import OrgInvite, OrgMembership, SubscriptionTier, SubscriptionStatus
+    from app.services.quota_service import get_or_create_subscription
+    from datetime import datetime, timezone
+    
+    pending_invites = await OrgInvite.find(
+        OrgInvite.email == user.email.lower(), 
+        OrgInvite.accepted == False
+    ).to_list()
+    
+    for invite in pending_invites:
+        if invite.expires_at > datetime.now(timezone.utc):
+            existing = await OrgMembership.find_one(
+                OrgMembership.org_id == invite.org_id, 
+                OrgMembership.user_id == user.id
+            )
+            if not existing:
+                await OrgMembership(
+                    org_id=invite.org_id, user_id=user.id, role=invite.role
+                ).insert()
+                sub = await get_or_create_subscription(user.id)
+                sub.tier = SubscriptionTier.enterprise
+                sub.status = SubscriptionStatus.active
+                await sub.save()
+            invite.accepted = True
+            await invite.save()
+
 @router.post("/register", response_model=UserOut, status_code=201)
 @limiter.limit("5/minute")
 async def register(
@@ -108,6 +135,9 @@ async def register(
     )
     await user.insert()
     
+    # Auto-accept any pending organization invites meant for this email
+    await _auto_accept_invites(user)
+    
     background_tasks.add_task(send_verification_email, body.email, verification_token)
     return user
 
@@ -122,6 +152,9 @@ async def login(request: Request, body: UserLogin):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is disabled")
+
+    # Auto-accept any pending organization invites meant for this email
+    await _auto_accept_invites(user)
 
     access_token = create_access_token(str(user.id), {"role": user.role.value})
     refresh_token = create_refresh_token(str(user.id))

@@ -82,8 +82,14 @@ async def create_org(body: OrgCreate, current_user: User = Depends(get_current_u
 
 @router.get("", response_model=List[OrgOut])
 async def list_my_orgs(current_user: User = Depends(get_current_user)):
+    from app.models.models import UserRole
+    if current_user.role == UserRole.admin:
+        return await Organization.find().to_list()
+        
     memberships = await OrgMembership.find(OrgMembership.user_id == current_user.id).to_list()
     org_ids = [m.org_id for m in memberships]
+    if not org_ids:
+        return []
     return await Organization.find({"_id": {"$in": org_ids}}).to_list()
 
 
@@ -101,12 +107,13 @@ async def delete_org(slug: str, current_user: User = Depends(get_current_user)):
     if not org:
         raise HTTPException(404, "Organization not found")
 
-    # Only owners can delete
-    membership = await OrgMembership.find_one(
-        OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
-    )
-    if not membership or membership.role != "owner":
-        raise HTTPException(403, "Only the organization owner can delete the organization")
+    # Only owners or superadmins can delete
+    if current_user.role.value != "admin":
+        membership = await OrgMembership.find_one(
+            OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
+        )
+        if not membership or membership.role != "owner":
+            raise HTTPException(403, "Only the organization owner can delete the organization")
 
     # Delete all members and invites
     await OrgMembership.find(OrgMembership.org_id == org.id).delete()
@@ -153,11 +160,12 @@ async def update_email_domains(
     if not org:
         raise HTTPException(404, "Organization not found")
 
-    membership = await OrgMembership.find_one(
-        OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
-    )
-    if not membership or membership.role not in ("owner", "admin"):
-        raise HTTPException(403, "Only owners/admins can update email domains")
+    if current_user.role.value != "admin":
+        membership = await OrgMembership.find_one(
+            OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
+        )
+        if not membership or membership.role not in ("owner", "admin"):
+            raise HTTPException(403, "Only owners/admins can update email domains")
 
     # Validate tier — only enterprise orgs can set email constraints
     tier = await get_user_tier(current_user.id)
@@ -200,11 +208,12 @@ async def invite_member(
     if not org:
         raise HTTPException(404, "Organization not found")
 
-    membership = await OrgMembership.find_one(
-        OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
-    )
-    if not membership or membership.role not in ("owner", "admin"):
-        raise HTTPException(403, "Only owners/admins can invite members")
+    if current_user.role.value != "admin":
+        membership = await OrgMembership.find_one(
+            OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
+        )
+        if not membership or membership.role not in ("owner", "admin"):
+            raise HTTPException(403, "Only owners/admins can invite members")
 
     # Validate email domain
     if not _validate_email_domain(body.email, org.allowed_email_domains):
@@ -243,6 +252,31 @@ async def invite_member(
     await invite.insert()
 
     # TODO: Send invitation email via email_service
+    from app.core.config import settings
+    import resend
+    
+    if settings.RESEND_API_KEY:
+        resend.api_key = settings.RESEND_API_KEY
+        invite_link = f"{settings.FRONTEND_URL}/join/{invite.token}"
+        try:
+            resend.Emails.send({
+                "from": settings.EMAIL_FROM,
+                "to": body.email.lower(),
+                "subject": f"You've been invited to join {org.name} on Parametrix AI",
+                "html": f"""
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2>Join {org.name}</h2>
+                    <p>You have been invited to join the <strong>{org.name}</strong> organization on Parametrix AI.</p>
+                    <p>Click the link below to accept the invitation and access the platform's enterprise features.</p>
+                    <a href="{invite_link}" style="display: inline-block; padding: 10px 20px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0;">Accept Invitation</a>
+                    <p style="color: #666; font-size: 14px;">Or copy and paste this link into your browser: <br/> {invite_link}</p>
+                </div>
+                """
+            })
+        except Exception as e:
+            # We don't want to crash the invite process just because email failed
+            # usually you would log this properly
+            print(f"Failed to send invite email: {e}")
 
     return invite
 
@@ -257,11 +291,12 @@ async def list_invites(
     if not org:
         raise HTTPException(404, "Organization not found")
 
-    membership = await OrgMembership.find_one(
-        OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
-    )
-    if not membership or membership.role not in ("owner", "admin"):
-        raise HTTPException(403, "Only owners/admins can view invites")
+    if current_user.role.value != "admin":
+        membership = await OrgMembership.find_one(
+            OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
+        )
+        if not membership or membership.role not in ("owner", "admin"):
+            raise HTTPException(403, "Only owners/admins can view invites")
 
     invites = await OrgInvite.find(
         OrgInvite.org_id == org.id,
@@ -281,11 +316,12 @@ async def revoke_invite(
     if not org:
         raise HTTPException(404, "Organization not found")
 
-    membership = await OrgMembership.find_one(
-        OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
-    )
-    if not membership or membership.role not in ("owner", "admin"):
-        raise HTTPException(403, "Only owners/admins can revoke invites")
+    if current_user.role.value != "admin":
+        membership = await OrgMembership.find_one(
+            OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
+        )
+        if not membership or membership.role not in ("owner", "admin"):
+            raise HTTPException(403, "Only owners/admins can revoke invites")
 
     invite = await OrgInvite.get(invite_id)
     if not invite or invite.org_id != org.id:
@@ -355,9 +391,10 @@ async def add_member(slug: str, user_id: uuid.UUID, current_user: User = Depends
     if not org:
         raise HTTPException(404, "Organization not found")
 
-    membership = await OrgMembership.find_one(OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id)
-    if not membership or membership.role not in ("owner", "admin"):
-        raise HTTPException(403, "Only owners/admins can add members")
+    if current_user.role.value != "admin":
+        membership = await OrgMembership.find_one(OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id)
+        if not membership or membership.role not in ("owner", "admin"):
+            raise HTTPException(403, "Only owners/admins can add members")
 
     # Validate email domain if constraints set
     target_user = await User.get(user_id)
@@ -389,9 +426,10 @@ async def remove_member(slug: str, user_id: uuid.UUID, current_user: User = Depe
     if not org:
         raise HTTPException(404, "Organization not found")
 
-    my_membership = await OrgMembership.find_one(OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id)
-    if not my_membership or my_membership.role not in ("owner", "admin"):
-        raise HTTPException(403, "Only owners/admins can remove members")
+    if current_user.role.value != "admin":
+        my_membership = await OrgMembership.find_one(OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id)
+        if not my_membership or my_membership.role not in ("owner", "admin"):
+            raise HTTPException(403, "Only owners/admins can remove members")
 
     target = await OrgMembership.find_one(OrgMembership.org_id == org.id, OrgMembership.user_id == user_id)
     if not target:
@@ -424,11 +462,12 @@ async def update_whitelabel(
     if not org:
         raise HTTPException(404, "Organization not found")
 
-    membership = await OrgMembership.find_one(
-        OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
-    )
-    if not membership or membership.role not in ("owner", "admin"):
-        raise HTTPException(403, "Only owners/admins can update branding")
+    if current_user.role.value != "admin":
+        membership = await OrgMembership.find_one(
+            OrgMembership.org_id == org.id, OrgMembership.user_id == current_user.id
+        )
+        if not membership or membership.role not in ("owner", "admin"):
+            raise HTTPException(403, "Only owners/admins can update branding")
 
     tier = await get_user_tier(current_user.id)
     if tier != SubscriptionTier.enterprise:

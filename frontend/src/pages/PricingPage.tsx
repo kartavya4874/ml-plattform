@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import {
     Box, Typography, Card, CardContent, Button, Chip, Divider, Grid,
-    CircularProgress,
+    CircularProgress, Backdrop
 } from '@mui/material'
 import {
     Check as CheckIcon,
@@ -12,8 +12,10 @@ import {
     AutoAwesome as SparkleIcon,
     Speed as SpeedIcon,
 } from '@mui/icons-material'
-import { fetchPricing, fetchSubscription, upgradeTier } from '../store/subscriptionSlice'
+import { fetchPricing, fetchSubscription } from '../store/subscriptionSlice'
 import type { AppDispatch, RootState } from '../store/store'
+import { useState } from 'react'
+import { api } from '../api/client'
 import type { PricingTier } from '../store/subscriptionSlice'
 
 const tierIcons: Record<string, React.ReactNode> = {
@@ -210,6 +212,8 @@ export default function PricingPage() {
 
     const token = useSelector((s: RootState) => s.auth.accessToken)
 
+    const [checkoutParams, setCheckoutParams] = useState<any>(null);
+
     useEffect(() => {
         dispatch(fetchPricing())
         if (token) {
@@ -217,14 +221,50 @@ export default function PricingPage() {
         }
     }, [dispatch, token])
 
+    useEffect(() => {
+        if (checkoutParams) {
+            // Give react a tick to render the form, then submit it
+            setTimeout(() => {
+                const form = document.getElementById('payu-form') as HTMLFormElement;
+                if (form) form.submit();
+            }, 500);
+        }
+    }, [checkoutParams])
+
     const handleUpgrade = async (tier: string) => {
-        await dispatch(upgradeTier(tier))
-        // Refresh subscription data after upgrade
-        dispatch(fetchSubscription())
+        try {
+            const { data } = await api.get(`/subscription/payu/checkout-params?tier=${tier}`);
+            setCheckoutParams(data);
+        } catch (e: any) {
+            alert(e.response?.data?.detail || "Failed to initiate payment gateway");
+        }
     }
 
     return (
         <Box className="fade-in" sx={{ maxWidth: 1200, mx: 'auto' }}>
+            
+            {/* PayU Overlay */}
+            {checkoutParams && (
+                <Backdrop open={true} sx={{ zIndex: 9999, flexDirection: 'column', color: '#fff' }}>
+                    <CircularProgress color="inherit" sx={{ mb: 2 }} />
+                    <Typography variant="h6" fontWeight={600}>Redirecting to PayU Secure Gateway...</Typography>
+                    <form id="payu-form" action={checkoutParams.actionUrl} method="POST" style={{ display: "none" }}>
+                        <input type="hidden" name="key" value={checkoutParams.key} />
+                        <input type="hidden" name="txnid" value={checkoutParams.txnid} />
+                        <input type="hidden" name="amount" value={checkoutParams.amount} />
+                        <input type="hidden" name="productinfo" value={checkoutParams.productinfo} />
+                        <input type="hidden" name="firstname" value={checkoutParams.firstname} />
+                        <input type="hidden" name="email" value={checkoutParams.email} />
+                        <input type="hidden" name="phone" value={checkoutParams.phone} />
+                        <input type="hidden" name="surl" value={checkoutParams.surl} />
+                        <input type="hidden" name="furl" value={checkoutParams.furl} />
+                        <input type="hidden" name="hash" value={checkoutParams.hash} />
+                        <input type="hidden" name="udf1" value={checkoutParams.udf1} />
+                        <input type="hidden" name="udf2" value={checkoutParams.udf2} />
+                    </form>
+                </Backdrop>
+            )}
+
             {/* Header */}
             <Box sx={{ textAlign: 'center', mb: 6, pt: 2 }}>
                 {token && summary && (

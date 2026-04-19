@@ -1,6 +1,7 @@
 """Subscription routes — /api/v1/subscription/"""
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import PlainTextResponse, Response
+from fastapi import APIRouter, Depends, HTTPException, Form, Request
+from fastapi.responses import PlainTextResponse, Response, RedirectResponse
+from app.core.config import settings
 
 from app.models.models import User, SubscriptionTier, SubscriptionStatus, Invoice
 from app.schemas.schemas import (
@@ -13,6 +14,7 @@ from app.services.quota_service import (
     PRICING_INFO, GPU_PRICING, get_metered_usage_summary,
 )
 from app.services.badges_service import award_manual_badge
+from app.services.payment_service import generate_txnid, generate_payu_hash, verify_payu_hash, get_payu_endpoint
 
 router = APIRouter(prefix="/subscription", tags=["Subscription & Billing"])
 
@@ -120,6 +122,112 @@ async def upgrade_subscription(
         "tier": new_tier.value,
         "note": "PayU payment gateway integration coming soon. This upgrade was applied directly.",
     }
+
+
+@router.get("/payu/checkout-params")
+async def payu_checkout_params(
+    tier: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Generate and return required hidden fields for PayU JS form submission."""
+    try:
+        new_tier = SubscriptionTier(tier)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid tier")
+
+    sub = await get_or_create_subscription(current_user.id)
+    tier_order = {SubscriptionTier.free: 0, SubscriptionTier.pro: 1, SubscriptionTier.payg: 2, SubscriptionTier.enterprise: 3}
+    if tier_order.get(new_tier, 0) <= tier_order.get(sub.tier, 0):
+        raise HTTPException(status_code=400, detail="Cannot downgrade or re-subscribe to current tier.")
+
+    # Find the tier pricing
+    price_str = "0.0"
+    for pt in PRICING_INFO:
+        if pt["tier"] == new_tier.value:
+            price_str = str(float(pt["price_monthly"]))
+            break
+
+    if float(price_str) == 0.0:
+        raise HTTPException(status_code=400, detail="Free tier does not require payment.")
+
+    txnid = generate_txnid()
+    productinfo = f"Parametrix AI - {new_tier.value.capitalize()} Tier"
+    firstname = current_user.full_name or "User"
+    email = current_user.email
+    
+    # Store critical metadata into User Defined Fields so we know who to upgrade on success
+    udf1 = str(current_user.id)
+    udf2 = new_tier.value
+
+    hash_val = generate_payu_hash(txnid, price_str, productinfo, firstname, email, udf1, udf2)
+
+    return {
+        "actionUrl": get_payu_endpoint(),
+        "key": settings.PAYU_KEY,
+        "txnid": txnid,
+        "amount": price_str,
+        "productinfo": productinfo,
+        "firstname": firstname,
+        "email": email,
+        "phone": "9999999999", # Dummy phone for test env
+        "surl": f"{settings.API_BASE_URL}/api/v1/subscription/payu/callback",
+        "furl": f"{settings.API_BASE_URL}/api/v1/subscription/payu/callback",
+        "udf1": udf1,
+        "udf2": udf2,
+        "hash": hash_val
+    }
+
+
+@router.post("/payu/callback")
+async def payu_callback(request: Request):
+    """
+    Handle POST callback from PayU after transaction.
+    Must verify hash heavily.
+    """
+    form_data = dict(await request.form())
+    
+    if not verify_payu_hash(form_data):
+        # Hash mismatch could mean tampering, always fail safely
+        return RedirectResponse(f"{settings.FRONTEND_URL}/dashboard?payment=failure&reason=hash_mismatch", status_code=303)
+
+    status = form_data.get("status")
+    if status != "success":
+        return RedirectResponse(f"{settings.FRONTEND_URL}/dashboard?payment=failure", status_code=303)
+
+    # Trust the payload since hash was verified
+    user_id_str = form_data.get("udf1", "")
+    new_tier_str = form_data.get("udf2", "")
+
+    try:
+        import uuid
+        user_id = uuid.UUID(user_id_str)
+        user = await User.get(user_id)
+        if not user:
+            raise ValueError("User not found")
+            
+        new_tier = SubscriptionTier(new_tier_str)
+        sub = await get_or_create_subscription(user_id)
+        
+        sub.tier = new_tier
+        sub.status = SubscriptionStatus.active
+        from datetime import datetime, timezone
+        sub.updated_at = datetime.now(timezone.utc)
+        await sub.save()
+
+        if new_tier == SubscriptionTier.pro:
+            user.role = "pro"
+            await award_manual_badge(user_id, "pro_subscriber")
+        elif new_tier in (SubscriptionTier.payg, SubscriptionTier.enterprise):
+            user.role = "admin"  # In standard flow, they might just be pro + payg. But adhering to previous logic.
+            if new_tier == SubscriptionTier.enterprise:
+                await award_manual_badge(user_id, "enterprise_member")
+        await user.save()
+        
+    except Exception as e:
+        print(f"Error provisioning PayU purchase: {e}")
+        return RedirectResponse(f"{settings.FRONTEND_URL}/dashboard?payment=error", status_code=303)
+
+    return RedirectResponse(f"{settings.FRONTEND_URL}/dashboard?payment=success&tier={new_tier_str}", status_code=303)
 
 
 @router.post("/cancel")
