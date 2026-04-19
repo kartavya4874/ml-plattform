@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Box, Typography, Button, CircularProgress } from '@mui/material'
 import { 
@@ -16,13 +16,17 @@ export default function VerifyEmailPage() {
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
     const [message, setMessage] = useState('Verifying your email address...')
 
+    const called = useRef(false)
+    const isMounted = useRef(true)
+
+    useEffect(() => {
+        return () => { isMounted.current = false }
+    }, [])
+
     useEffect(() => {
         const verify = async () => {
-            if (!token) {
-                setStatus('error')
-                setMessage('Invalid verification link.')
-                return
-            }
+            if (!token || called.current) return
+            called.current = true
 
             try {
                 const response = await client.get(`/auth/verify/${token}`)
