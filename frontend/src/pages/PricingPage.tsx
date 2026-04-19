@@ -170,10 +170,10 @@ function PricingCard({ plan, currentTier, onUpgrade, upgrading }: {
                         fullWidth variant="contained"
                         disabled={upgrading}
                         onClick={() => {
-                            if (!window.localStorage.getItem('token') && !document.cookie.includes('token')) {
+                            if (!token) {
                                 window.location.href = '/login'
                             } else {
-                                onUpgrade(plan.tier)
+                                handleUpgrade(plan.tier)
                             }
                         }}
                         sx={{

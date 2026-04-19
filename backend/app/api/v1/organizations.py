@@ -69,6 +69,13 @@ class WhitelabelUpdate(BaseModel):
 
 @router.post("", response_model=OrgOut, status_code=201)
 async def create_org(body: OrgCreate, current_user: User = Depends(get_current_user)):
+    # Lockdown: Only Enterprise users can create Organizations
+    from app.services.quota_service import get_user_tier
+    from app.models.models import SubscriptionTier
+    tier = await get_user_tier(current_user.id)
+    if tier != SubscriptionTier.enterprise and current_user.role.value != "admin":
+        raise HTTPException(status_code=403, detail="Organization creation is restricted to Enterprise tier subscribers.")
+
     slug = re.sub(r"[^a-z0-9]+", "-", body.name.lower()).strip("-")
     existing = await Organization.find_one(Organization.slug == slug)
     if existing:
