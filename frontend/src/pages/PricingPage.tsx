@@ -46,11 +46,12 @@ const tierAccent: Record<string, string> = {
     enterprise: '#F59E0B',
 }
 
-function PricingCard({ plan, currentTier, onUpgrade, upgrading }: {
+function PricingCard({ plan, currentTier, onUpgrade, upgrading, isAuthenticated }: {
     plan: PricingTier
     currentTier: string
     onUpgrade: (tier: string) => void
     upgrading: boolean
+    isAuthenticated: boolean
 }) {
     const isCurrent = currentTier === plan.tier
     const isPopular = plan.is_popular
@@ -170,10 +171,10 @@ function PricingCard({ plan, currentTier, onUpgrade, upgrading }: {
                         fullWidth variant="contained"
                         disabled={upgrading}
                         onClick={() => {
-                            if (!token) {
+                            if (!isAuthenticated) {
                                 window.location.href = '/login'
                             } else {
-                                handleUpgrade(plan.tier)
+                                onUpgrade(plan.tier)
                             }
                         }}
                         sx={{
@@ -321,6 +322,7 @@ export default function PricingPage() {
                                 currentTier={currentTier}
                                 onUpgrade={handleUpgrade}
                                 upgrading={upgrading}
+                                isAuthenticated={!!token}
                             />
                         </Grid>
                     ))}
