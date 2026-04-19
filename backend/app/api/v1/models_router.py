@@ -100,6 +100,13 @@ async def delete_model(
     if model.stage == ModelStage.production:
         raise HTTPException(status_code=409, detail="Cannot delete a production model. Archive it first.")
     
+    # Decrement Usage explicitly to prevent model Quota Leakage
+    from app.models.models import UsageRecord
+    usage = await UsageRecord.find_one(UsageRecord.user_id == current_user.id)
+    if usage:
+        usage.models_created = max(0, usage.models_created - 1)
+        await usage.save()
+
     await model.delete()
 
 

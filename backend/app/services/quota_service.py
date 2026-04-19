@@ -302,8 +302,10 @@ async def check_quota(user_id: uuid.UUID, resource_type: str, amount: int = 1):
         return  # Unknown resource type — no enforcement
 
     max_allowed = limits[limit_key]
-    usage = await get_or_create_usage(user_id)
     usage_field = RESOURCE_TO_USAGE_FIELD.get(resource_type, resource_type)
+
+    # Note: We still perform this pre-flight check so the frontend gets a clean error message
+    usage = await get_or_create_usage(user_id)
     current = getattr(usage, usage_field, 0)
 
     if current + amount > max_allowed:
@@ -330,13 +332,42 @@ async def check_gpu_access(user_id: uuid.UUID) -> bool:
 
 
 async def increment_usage(user_id: uuid.UUID, resource_type: str, amount: int = 1):
-    """Atomically increment a usage counter for the current billing period."""
-    usage = await get_or_create_usage(user_id)
+    """
+    Atomically increment a usage counter for the current billing period, securely 
+    enforcing quota limits natively in MongoDB to prevent race-condition exploits.
+    """
+    tier = await get_user_tier(user_id)
+    limits = get_tier_limits(tier)
+    
+    limit_key = RESOURCE_TO_LIMIT_KEY.get(resource_type)
     usage_field = RESOURCE_TO_USAGE_FIELD.get(resource_type, resource_type)
-    current = getattr(usage, usage_field, 0)
-    setattr(usage, usage_field, current + amount)
-    usage.updated_at = datetime.now(timezone.utc)
-    await usage.save()
+    
+    # If no limit applies, just increment blindly
+    if not limit_key:
+        usage = await get_or_create_usage(user_id)
+        current = getattr(usage, usage_field, 0)
+        setattr(usage, usage_field, current + amount)
+        usage.updated_at = datetime.now(timezone.utc)
+        await usage.save()
+        return
+
+    max_allowed = limits[limit_key]
+    period_start, _ = _current_period_bounds()
+    
+    # Secure Atomic Increment: Match only if existing usage + amount <= max_allowed limit
+    from app.models.models import UsageRecord
+    updated = await UsageRecord.find_one(
+        UsageRecord.user_id == user_id,
+        UsageRecord.period_start == period_start,
+        getattr(UsageRecord, usage_field) <= max_allowed - amount
+    ).update({"$inc": {usage_field: amount}, "$set": {"updated_at": datetime.now(timezone.utc)}})
+
+    if not updated:
+        # The atomic update failed, which means the quota hit the cap exactly at commit time
+        raise HTTPException(
+            status_code=402,
+            detail=f"Resource locked: the requested {resource_type} would exceed your quota limit of {max_allowed}."
+        )
 
 
 async def record_metered_usage(

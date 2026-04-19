@@ -60,19 +60,16 @@ async def get_current_user(
     if payload.get("type") != "access":
         raise HTTPException(status_code=401, detail="Invalid token type")
 
-    # Check revocation list (skip if Redis is unavailable)
-    if redis_client is not None:
-        try:
-            revoked = await redis_client.get(f"revoked:{token}")
-            if revoked:
-                raise HTTPException(status_code=401, detail="Token has been revoked")
-        except Exception:
-            logger.warning("Redis error during revocation check — skipping.")
-
+    # Check Stateless Revocation
     user_id = payload.get("sub")
     user = await User.get(uuid.UUID(user_id))
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="User not found or inactive")
+        
+    token_version = payload.get("token_version", 1)
+    if token_version != getattr(user, "token_version", 1):
+        raise HTTPException(status_code=401, detail="Token has been explicitly revoked")
+        
     return user
 
 
@@ -156,8 +153,9 @@ async def login(request: Request, body: UserLogin):
     # Auto-accept any pending organization invites meant for this email
     await _auto_accept_invites(user)
 
-    access_token = create_access_token(str(user.id), {"role": user.role.value})
-    refresh_token = create_refresh_token(str(user.id))
+    tv = getattr(user, "token_version", 1)
+    access_token = create_access_token(str(user.id), {"role": user.role.value}, token_version=tv)
+    refresh_token = create_refresh_token(str(user.id), token_version=tv)
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 
@@ -173,8 +171,13 @@ async def refresh(body: RefreshRequest):
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
         
-    access_token = create_access_token(str(user.id), {"role": user.role.value})
-    new_refresh = create_refresh_token(str(user.id))
+    tv_payload = payload.get("token_version", 1)
+    tv_user = getattr(user, "token_version", 1)
+    if tv_payload != tv_user:
+        raise HTTPException(status_code=401, detail="Refresh token has been revoked")
+        
+    access_token = create_access_token(str(user.id), {"role": user.role.value}, token_version=tv_user)
+    new_refresh = create_refresh_token(str(user.id), token_version=tv_user)
     return TokenResponse(access_token=access_token, refresh_token=new_refresh)
 
 
@@ -183,15 +186,15 @@ async def logout(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     redis_client=Depends(get_redis),
 ):
-    """Revoke the current access token by adding to Redis denylist."""
+    """Revoke all active tokens by incrementing the token_version mathematically."""
     token = credentials.credentials
     payload = decode_token(token)
-    ttl = int(payload.get("exp", 0) - time.time())
-    if ttl > 0 and redis_client is not None:
-        try:
-            await redis_client.setex(f"revoked:{token}", ttl, "1")
-        except Exception:
-            logger.warning("Redis unavailable — could not revoke token.")
+    
+    user_id = payload.get("sub")
+    user = await User.get(uuid.UUID(user_id))
+    if user:
+        user.token_version = getattr(user, "token_version", 1) + 1
+        await user.save()
 
 
 @router.get("/me", response_model=UserOut)

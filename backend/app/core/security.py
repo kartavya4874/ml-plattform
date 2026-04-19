@@ -20,17 +20,17 @@ def verify_password(plain: str, hashed: str) -> bool:
 from fastapi import HTTPException, status
 from app.core.config import settings
 
-def create_access_token(subject: str | Any, extra: dict | None = None) -> str:
+def create_access_token(subject: str | Any, extra: dict | None = None, token_version: int = 1) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": str(subject), "exp": expire, "type": "access"}
+    payload = {"sub": str(subject), "exp": expire, "type": "access", "token_version": token_version}
     if extra:
         payload.update(extra)
     return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
-def create_refresh_token(subject: str | Any) -> str:
+def create_refresh_token(subject: str | Any, token_version: int = 1) -> str:
     expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    payload = {"sub": str(subject), "exp": expire, "type": "refresh"}
+    payload = {"sub": str(subject), "exp": expire, "type": "refresh", "token_version": token_version}
     return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 

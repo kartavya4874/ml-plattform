@@ -15,8 +15,7 @@ def utcnow() -> datetime:
 
 class UserRole(str, enum.Enum):
     admin = "admin"
-    pro = "pro"
-    free = "free"
+    user = "user"
 
 class SubscriptionTier(str, enum.Enum):
     free = "free"
@@ -69,8 +68,9 @@ class User(Document):
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
     email: Indexed(str, unique=True)
     hashed_password: str
+    token_version: int = 1
     full_name: Optional[str] = None
-    role: UserRole = UserRole.free
+    role: UserRole = UserRole.user
     is_active: bool = True
     is_verified: bool = False
     is_2fa_enabled: bool = False

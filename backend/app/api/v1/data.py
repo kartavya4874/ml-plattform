@@ -234,6 +234,13 @@ async def delete_dataset(
     if dataset.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only owner can delete dataset")
 
+    # Decrement Usage explicitly to prevent Storage Quota leakage
+    from app.models.models import UsageRecord
+    usage = await UsageRecord.find_one(UsageRecord.user_id == current_user.id)
+    if usage:
+        usage.storage_bytes_used = max(0, usage.storage_bytes_used - dataset.file_size_bytes)
+        await usage.save()
+
     # Delete from MinIO
     await storage.delete_object(settings.R2_BUCKET_DATA, dataset.minio_path)
 

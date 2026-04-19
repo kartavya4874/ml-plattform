@@ -107,14 +107,11 @@ async def upgrade_subscription(
     sub.updated_at = datetime.now(timezone.utc)
     await sub.save()
 
-    # Also update the user role to match
+    # Grant Badges to Pro/Enterprise Users
     if new_tier == SubscriptionTier.pro:
-        current_user.role = "pro"
         await award_manual_badge(current_user.id, "pro_subscriber")
-    elif new_tier in (SubscriptionTier.payg, SubscriptionTier.enterprise):
-        current_user.role = "admin"
-        if new_tier == SubscriptionTier.enterprise:
-            await award_manual_badge(current_user.id, "enterprise_member")
+    elif new_tier == SubscriptionTier.enterprise:
+        await award_manual_badge(current_user.id, "enterprise_member")
     await current_user.save()
 
     return {
@@ -214,13 +211,11 @@ async def payu_callback(request: Request):
         sub.updated_at = datetime.now(timezone.utc)
         await sub.save()
 
+        # Grant Badges
         if new_tier == SubscriptionTier.pro:
-            user.role = "pro"
             await award_manual_badge(user_id, "pro_subscriber")
-        elif new_tier in (SubscriptionTier.payg, SubscriptionTier.enterprise):
-            user.role = "admin"  # In standard flow, they might just be pro + payg. But adhering to previous logic.
-            if new_tier == SubscriptionTier.enterprise:
-                await award_manual_badge(user_id, "enterprise_member")
+        elif new_tier == SubscriptionTier.enterprise:
+            await award_manual_badge(user_id, "enterprise_member")
         await user.save()
         
     except Exception as e:
