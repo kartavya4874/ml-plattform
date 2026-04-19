@@ -191,6 +191,7 @@ class MLModel(Document):
 
 
 class Deployment(Document):
+    model_config = ConfigDict(protected_namespaces=())
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
     model_id: uuid.UUID
     endpoint_url: str
@@ -203,6 +204,7 @@ class Deployment(Document):
 
 
 class APIKey(Document):
+    model_config = ConfigDict(protected_namespaces=())
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
     model_id: uuid.UUID
     owner_id: uuid.UUID
@@ -463,6 +465,7 @@ class Competition(Document):
 
 
 class Submission(Document):
+    model_config = ConfigDict(protected_namespaces=())
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
     competition_id: uuid.UUID
     user_id: uuid.UUID

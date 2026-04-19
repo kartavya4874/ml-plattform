@@ -10,6 +10,7 @@ async def init_db():
     """Initialize MongoDB connection and Beanie ODM."""
     from app.models.models import (
         User, Dataset, TrainingJob, MLModel, 
+        PricingConfig,
         Deployment, APIKey, InferenceLog, AuditLog,
         Subscription, UsageRecord, UsageMeteredEvent, Invoice,
         Discussion, Comment, Vote,
@@ -31,6 +32,7 @@ async def init_db():
     
     document_models = [
         User, Dataset, TrainingJob, MLModel,
+        PricingConfig,
         Deployment, APIKey, InferenceLog, AuditLog,
         Subscription, UsageRecord, UsageMeteredEvent, Invoice,
         Discussion, Comment, Vote,
