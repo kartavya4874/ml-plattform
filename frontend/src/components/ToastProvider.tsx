@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback } from 'react'
-import { Snackbar, Alert, AlertColor, Slide, SlideProps } from '@mui/material'
+import { Snackbar, Alert, type AlertColor, Slide, type SlideProps } from '@mui/material'
 
 interface ToastMessage {
     id: number
