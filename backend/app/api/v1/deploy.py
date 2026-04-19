@@ -4,7 +4,7 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException
 from app.models.models import User, MLModel, ModelStage, Deployment, APIKey
 from app.schemas.schemas import DeploymentOut, APIKeyOut
-from app.api.v1.auth import get_current_user
+from app.api.v1.auth import get_current_user, get_verified_user
 from app.core.security import hash_api_key
 from app.services.quota_service import check_quota, increment_usage
 from app.core.config import settings
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/deploy", tags=["Deployment"])
 @router.post("/{model_id}/api", response_model=DeploymentOut, status_code=201)
 async def deploy_model(
     model_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Generate and activate a REST API endpoint for the model."""
     # Check deployment quota
@@ -191,7 +191,7 @@ async def list_all_api_keys(
 @router.post("/keys/{key_id}/regenerate", response_model=APIKeyOut)
 async def regenerate_api_key(
     key_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Revoke an existing key and create a replacement with the same name."""
     old_key = await APIKey.find_one(
@@ -226,7 +226,7 @@ async def regenerate_api_key(
 async def create_api_key(
     model_id: uuid.UUID,
     name: str = "New Key",
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Generate a new API key for a deployed model."""
     raw_key = f"sk-{secrets.token_urlsafe(32)}"

@@ -95,6 +95,19 @@ class User(Document):
         name = "users"
 
 
+class PricingConfig(Document):
+    """Singleton document to store platform-wide pricing and tier limits."""
+    id: str = Field(default="default_config", alias="_id")
+    tier_limits: Dict[str, Any]
+    gpu_pricing: Dict[str, Any]
+    payg_unit_pricing: Dict[str, Any]
+    pricing_info: List[Dict[str, Any]]
+    updated_at: datetime = Field(default_factory=utcnow)
+
+    class Settings:
+        name = "pricing_config"
+
+
 class Dataset(Document):
     id: uuid.UUID = Field(default_factory=uuid.uuid4)
     owner_id: uuid.UUID

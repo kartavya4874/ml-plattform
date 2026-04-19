@@ -8,13 +8,13 @@ from fastapi import HTTPException
 from app.models.models import (
     Subscription, UsageRecord, UsageMeteredEvent,
     SubscriptionTier, SubscriptionStatus, User,
-    OrgMembership, Organization
+    OrgMembership, Organization, PricingConfig
 )
 
 
-# ── Tier Limits Configuration ─────────────────────────────────────────────────
+# ── Defaults (Fallback) ───────────────────────────────────────────────────────
 
-TIER_LIMITS = {
+DEFAULT_TIER_LIMITS = {
     SubscriptionTier.free: {
         "datasets": 10,
         "max_file_size_bytes": 100 * 1024 * 1024,       # 100 MB
@@ -57,17 +57,13 @@ TIER_LIMITS = {
     },
 }
 
-# ── GPU Pricing (per hour in ₹) ──────────────────────────────────────────────
-
-GPU_PRICING = {
+DEFAULT_GPU_PRICING = {
     "T4": {"per_hour": 50.0, "description": "NVIDIA T4 — 16GB VRAM, great for inference & light training"},
     "A10G": {"per_hour": 90.0, "description": "NVIDIA A10G — 24GB VRAM, ideal for medium training"},
     "A100": {"per_hour": 200.0, "description": "NVIDIA A100 — 80GB VRAM, maximum performance"},
 }
 
-# ── PAYG Unit Pricing (in ₹) ────────────────────────────────────────────────
-
-PAYG_UNIT_PRICING = {
+DEFAULT_PAYG_UNIT_PRICING = {
     "gpu_minute_T4": 50.0 / 60,      # ₹0.83/min
     "gpu_minute_A10G": 90.0 / 60,     # ₹1.50/min
     "gpu_minute_A100": 200.0 / 60,    # ₹3.33/min
@@ -77,8 +73,7 @@ PAYG_UNIT_PRICING = {
     "training_job": 5.0,               # ₹5/job base
 }
 
-
-PRICING_INFO = [
+DEFAULT_PRICING_INFO = [
     {
         "tier": "free",
         "name": "Free",
@@ -86,20 +81,20 @@ PRICING_INFO = [
         "price_label": "₹0",
         "description": "Perfect for exploring the platform and building your first models.",
         "limits": {
-            "datasets": 3,
+            "datasets": 10,
             "max_file_size_mb": 100,
-            "training_jobs_per_month": 5,
-            "models": 3,
-            "deployments": 1,
-            "inference_requests_per_month": 1_000,
-            "api_keys_per_model": 1,
+            "training_jobs_per_month": 20,
+            "models": 10,
+            "deployments": 3,
+            "inference_requests_per_month": 5_000,
+            "api_keys_per_model": 2,
         },
         "features": [
-            "3 datasets (up to 100 MB each)",
-            "5 training jobs per month",
-            "3 models",
-            "1 deployment",
-            "1,000 inference requests/month",
+            "10 datasets (up to 100 MB each)",
+            "20 training jobs per month",
+            "10 models",
+            "3 deployments",
+            "5,000 inference requests/month",
             "Community support",
             "Data profiling & quality reports",
         ],
@@ -148,14 +143,14 @@ PRICING_INFO = [
             "api_keys_per_model": 20,
         },
         "features": [
-            "₹499/mo base + usage-based billing",
-            "GPU: ₹50/hr (T4) · ₹90/hr (A10G) · ₹200/hr (A100)",
-            "Up to 100 datasets (50 GB each)",
-            "Unlimited training jobs",
+            "100 datasets (up to 50 GB each)",
+            "Unlimited training jobs (metered)",
             "100 models & 50 deployments",
-            "Storage: ₹2/GB/month",
+            "Unlimited inference (metered)",
+            "All GPU clusters available",
+            "₹50/hr (T4) · ₹90/hr (A10G) · ₹200/hr (A100)",
+            "Scale-to-zero deployments",
             "API calls: ₹0.001/request",
-            "Priority support",
         ],
         "is_popular": False,
     },
@@ -164,7 +159,7 @@ PRICING_INFO = [
         "name": "Enterprise",
         "price_monthly": 15999,
         "price_label": "₹15,999/mo",
-        "description": "Unlimited scale for large teams and enterprise deployments.",
+        "description": "Enterprise-grade features, custom limits, and dedicated support.",
         "limits": {
             "datasets": 999_999,
             "max_file_size_mb": 51200,
@@ -175,19 +170,52 @@ PRICING_INFO = [
             "api_keys_per_model": 999_999,
         },
         "features": [
-            "Unlimited everything",
-            "All GPU types included",
+            "Unlimited datasets & storage",
+            "Unlimited models & deployments",
+            "SLA-backed priority support",
             "Organization management",
-            "Email domain restrictions",
             "White-labeling & custom branding",
-            "Custom domain routing",
-            "Dedicated support & SLA",
-            "SSO & team management",
             "Audit logs & compliance",
+            "Dedicated solutions architect",
+            "SSO Integration",
         ],
         "is_popular": False,
     },
 ]
+
+# ── Dynamic Config Loader ─────────────────────────────────────────────────────
+
+async def load_pricing_config() -> PricingConfig:
+    """Fetch dynamic pricing from DB or create from defaults if missing."""
+    config = await PricingConfig.get("default_config")
+    if not config:
+        # Create singleton with defaults
+        config = PricingConfig(
+            id="default_config",
+            tier_limits={k.value: v for k, v in DEFAULT_TIER_LIMITS.items()},
+            gpu_pricing=DEFAULT_GPU_PRICING,
+            payg_unit_pricing=DEFAULT_PAYG_UNIT_PRICING,
+            pricing_info=DEFAULT_PRICING_INFO
+        )
+        await config.insert()
+    return config
+
+async def get_dynamic_tier_limits():
+    cfg = await load_pricing_config()
+    # Convert string keys back to Enums for internal use
+    return {SubscriptionTier(k): v for k, v in cfg.tier_limits.items()}
+
+async def get_dynamic_pricing_info():
+    cfg = await load_pricing_config()
+    return cfg.pricing_info
+
+async def get_dynamic_gpu_pricing():
+    cfg = await load_pricing_config()
+    return cfg.gpu_pricing
+
+async def get_dynamic_payg_unit_pricing():
+    cfg = await load_pricing_config()
+    return cfg.payg_unit_pricing
 
 
 def _current_period_bounds() -> tuple[datetime, datetime]:
@@ -235,9 +263,10 @@ async def get_or_create_usage(user_id: uuid.UUID) -> UsageRecord:
     return usage
 
 
-def get_tier_limits(tier: SubscriptionTier) -> dict:
-    """Return the limits dict for a given tier."""
-    return TIER_LIMITS.get(tier, TIER_LIMITS[SubscriptionTier.free])
+async def get_tier_limits(tier: SubscriptionTier) -> dict:
+    """Return the limits dict for a given tier (fetched dynamically)."""
+    limits = await get_dynamic_tier_limits()
+    return limits.get(tier, limits[SubscriptionTier.free])
 
 
 async def get_user_tier(user_id: uuid.UUID) -> SubscriptionTier:
@@ -296,7 +325,7 @@ async def check_quota(user_id: uuid.UUID, resource_type: str, amount: int = 1):
     for the given resource_type.
     """
     tier = await get_user_tier(user_id)
-    limits = get_tier_limits(tier)
+    limits = await get_tier_limits(tier)
     limit_key = RESOURCE_TO_LIMIT_KEY.get(resource_type)
     if not limit_key:
         return  # Unknown resource type — no enforcement
@@ -327,7 +356,7 @@ async def check_quota(user_id: uuid.UUID, resource_type: str, amount: int = 1):
 async def check_gpu_access(user_id: uuid.UUID) -> bool:
     """Check if user's tier allows GPU access."""
     tier = await get_user_tier(user_id)
-    limits = get_tier_limits(tier)
+    limits = await get_tier_limits(tier)
     return limits.get("gpu_enabled", False)
 
 
@@ -337,7 +366,7 @@ async def increment_usage(user_id: uuid.UUID, resource_type: str, amount: int = 
     enforcing quota limits natively in MongoDB to prevent race-condition exploits.
     """
     tier = await get_user_tier(user_id)
-    limits = get_tier_limits(tier)
+    limits = await get_tier_limits(tier)
     
     limit_key = RESOURCE_TO_LIMIT_KEY.get(resource_type)
     usage_field = RESOURCE_TO_USAGE_FIELD.get(resource_type, resource_type)
@@ -377,7 +406,8 @@ async def record_metered_usage(
     metadata: dict = None,
 ) -> UsageMeteredEvent:
     """Record a metered usage event for PAYG billing."""
-    unit_price = PAYG_UNIT_PRICING.get(event_type, 0.0)
+    unit_pricing = await get_dynamic_payg_unit_pricing()
+    unit_price = unit_pricing.get(event_type, 0.0)
     total_cost = quantity * unit_price
 
     event = UsageMeteredEvent(
@@ -418,20 +448,28 @@ async def get_metered_usage_summary(user_id: uuid.UUID) -> dict:
         breakdown[e.event_type]["total_cost"] += e.total_cost
         total_cost += e.total_cost
 
+    # Find base fee from pricing_info
+    pricing_info = await get_dynamic_pricing_info()
+    base_fee = 499.0
+    for p in pricing_info:
+        if p.get("tier") == "payg":
+            base_fee = float(p.get("price_monthly", 499.0))
+            break
+
     return {
         "period_start": period_start.isoformat(),
         "period_end": period_end.isoformat(),
         "breakdown": breakdown,
         "total_cost": round(total_cost, 2),
-        "base_fee": 499.0,  # PAYG base fee
-        "estimated_bill": round(499.0 + total_cost, 2),
+        "base_fee": base_fee,
+        "estimated_bill": round(base_fee + total_cost, 2),
     }
 
 
 async def get_usage_summary(user_id: uuid.UUID) -> dict:
     """Return current usage vs limits for the user."""
     tier = await get_user_tier(user_id)
-    limits = get_tier_limits(tier)
+    limits = await get_tier_limits(tier)
     usage = await get_or_create_usage(user_id)
     return {
         "tier": tier.value,

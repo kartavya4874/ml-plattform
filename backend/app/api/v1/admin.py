@@ -8,7 +8,7 @@ from datetime import datetime
 from app.models.models import (
     User, UserRole, Dataset, MLModel, Notebook,
     Competition, Organization, Discussion,
-    Subscription, SubscriptionTier,
+    Subscription, SubscriptionTier, PricingConfig
 )
 from app.api.v1.auth import get_current_user
 
@@ -55,6 +55,12 @@ class AdminUserUpdate(BaseModel):
     role: Optional[str] = None
     is_active: Optional[bool] = None
     is_verified: Optional[bool] = None
+
+class PricingConfigUpdate(BaseModel):
+    tier_limits: Optional[dict] = None
+    gpu_pricing: Optional[dict] = None
+    payg_unit_pricing: Optional[dict] = None
+    pricing_info: Optional[list] = None
 
 
 @router.get("/users", response_model=List[AdminUserOut])
@@ -240,3 +246,31 @@ async def admin_force_delete_competition(comp_id: uuid.UUID, current_user: User 
     await Submission.find(Submission.competition_id == comp.id).delete()
     await comp.delete()
 
+# ── Pricing Management ──────────────────────────────────────────────────
+
+@router.get("/pricing-config")
+async def get_admin_pricing_config(current_user: User = Depends(get_current_user)):
+    _require_admin(current_user)
+    from app.services.quota_service import load_pricing_config
+    return await load_pricing_config()
+
+
+@router.patch("/pricing-config")
+async def update_admin_pricing_config(body: PricingConfigUpdate, current_user: User = Depends(get_current_user)):
+    _require_admin(current_user)
+    from app.services.quota_service import load_pricing_config
+    config = await load_pricing_config()
+    
+    if body.tier_limits is not None:
+        config.tier_limits = body.tier_limits
+    if body.gpu_pricing is not None:
+        config.gpu_pricing = body.gpu_pricing
+    if body.payg_unit_pricing is not None:
+        config.payg_unit_pricing = body.payg_unit_pricing
+    if body.pricing_info is not None:
+        config.pricing_info = body.pricing_info
+        
+    from datetime import datetime, timezone
+    config.updated_at = datetime.now(timezone.utc)
+    await config.save()
+    return config

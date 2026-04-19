@@ -73,6 +73,16 @@ async def get_current_user(
     return user
 
 
+async def get_verified_user(user: User = Depends(get_current_user)) -> User:
+    """Guard that requires the user to have a verified email address."""
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your email address is not verified. Please check your inbox or resend the verification email."
+        )
+    return user
+
+
 async def _auto_accept_invites(user: User):
     from app.models.models import OrgInvite, OrgMembership, SubscriptionTier, SubscriptionStatus
     from app.services.quota_service import get_or_create_subscription
@@ -149,6 +159,11 @@ async def login(request: Request, body: UserLogin):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is disabled")
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=403, 
+            detail="Email address not verified. Please verify your email before logging in."
+        )
 
     # Auto-accept any pending organization invites meant for this email
     await _auto_accept_invites(user)

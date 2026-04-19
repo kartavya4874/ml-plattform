@@ -11,7 +11,8 @@ from app.api.v1.auth import get_current_user
 from app.services.quota_service import (
     get_or_create_subscription, get_or_create_usage,
     get_usage_summary, get_user_tier, get_tier_limits,
-    PRICING_INFO, GPU_PRICING, get_metered_usage_summary,
+    get_metered_usage_summary,
+    get_dynamic_pricing_info, get_dynamic_gpu_pricing,
 )
 from app.services.badges_service import award_manual_badge
 from app.services.payment_service import generate_txnid, generate_payu_hash, verify_payu_hash, get_payu_endpoint
@@ -22,13 +23,13 @@ router = APIRouter(prefix="/subscription", tags=["Subscription & Billing"])
 @router.get("/pricing", response_model=list[PricingTierInfo])
 async def get_pricing():
     """Public endpoint — return all pricing tiers and their features."""
-    return PRICING_INFO
+    return await get_dynamic_pricing_info()
 
 
 @router.get("/gpu-pricing")
 async def get_gpu_pricing():
     """Public endpoint — return GPU pricing info."""
-    return GPU_PRICING
+    return await get_dynamic_gpu_pricing()
 
 
 @router.get("", response_model=SubscriptionSummary)
@@ -39,7 +40,7 @@ async def get_subscription(
     sub = await get_or_create_subscription(current_user.id)
     usage_record = await get_or_create_usage(current_user.id)
     tier = await get_user_tier(current_user.id)
-    limits = get_tier_limits(tier)
+    limits = await get_tier_limits(tier)
 
     return SubscriptionSummary(
         subscription=sub,
@@ -59,6 +60,7 @@ async def get_subscription(
             deployments=limits["deployments"],
             inference_requests_per_month=limits["inference_requests_per_month"],
             api_keys_per_model=limits["api_keys_per_model"],
+            gpu_enabled=limits.get("gpu_enabled", False),
         ),
         tier=tier.value,
     )
@@ -75,7 +77,7 @@ async def get_usage(
 @router.post("/upgrade/{tier}")
 async def upgrade_subscription(
     tier: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """
     Upgrade subscription tier.
@@ -139,7 +141,8 @@ async def payu_checkout_params(
 
     # Find the tier pricing
     price_str = "0.0"
-    for pt in PRICING_INFO:
+    pricing_info = await get_dynamic_pricing_info()
+    for pt in pricing_info:
         if pt["tier"] == new_tier.value:
             price_str = str(float(pt["price_monthly"]))
             break
@@ -181,9 +184,18 @@ async def payu_callback(request: Request):
     Handle POST callback from PayU after transaction.
     Must verify hash heavily.
     """
-    form_data = dict(await request.form())
+    import structlog
+    log = structlog.get_logger()
+    
+    try:
+        form_data = dict(await request.form())
+        log.info("payu.callback_received", txnid=form_data.get("txnid"), status=form_data.get("status"))
+    except Exception as e:
+        log.error("payu.callback_data_error", error=str(e))
+        return RedirectResponse(f"{settings.FRONTEND_URL}/dashboard?payment=error&reason=data_parsing", status_code=303)
     
     if not verify_payu_hash(form_data):
+        log.warning("payu.hash_mismatch", txnid=form_data.get("txnid"), received_hash=form_data.get("hash"))
         # Hash mismatch could mean tampering, always fail safely
         return RedirectResponse(f"{settings.FRONTEND_URL}/dashboard?payment=failure&reason=hash_mismatch", status_code=303)
 
@@ -219,9 +231,10 @@ async def payu_callback(request: Request):
         await user.save()
         
     except Exception as e:
-        print(f"Error provisioning PayU purchase: {e}")
+        log.error("payu.provisioning_error", user_id=user_id_str, error=str(e))
         return RedirectResponse(f"{settings.FRONTEND_URL}/dashboard?payment=error", status_code=303)
-
+    
+    log.info("payu.payment_success", user_id=user_id_str, tier=new_tier_str)
     return RedirectResponse(f"{settings.FRONTEND_URL}/dashboard?payment=success&tier={new_tier_str}", status_code=303)
 
 

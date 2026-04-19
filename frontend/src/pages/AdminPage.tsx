@@ -16,6 +16,7 @@ export default function AdminPage() {
     const [organizations, setOrganizations] = useState<any[]>([])
     const [competitions, setCompetitions] = useState<any[]>([])
     const [auditLogs, setAuditLogs] = useState<any[]>([])
+    const [pricingConfig, setPricingConfig] = useState<any>(null)
     
     // Badge state
     const [badgeUser, setBadgeUser] = useState('')
@@ -30,6 +31,7 @@ export default function AdminPage() {
             ])
             setStats(st.data); setUsers(u.data); setDatasets(d.data); setModels(m.data); setDiscussions(di.data); setAuditLogs(al.data);
             setOrganizations(orgs.data); setCompetitions(comps.data);
+            loadPricing()
         } catch (e) { console.error(e) }
     }
 
@@ -85,6 +87,21 @@ export default function AdminPage() {
         }
     }
 
+    const loadPricing = async () => {
+        try {
+            const res = await api.get('/admin/pricing-config')
+            setPricingConfig(res.data)
+        } catch (e) { console.error(e) }
+    }
+
+    const savePricingConfig = async (patch: any) => {
+        try {
+            await api.patch('/admin/pricing-config', patch)
+            alert('Settings saved')
+            loadPricing()
+        } catch (e: any) { alert(e.response?.data?.detail || e.message) }
+    }
+
     if (user?.role !== 'admin') {
         return (
             <Box sx={{ textAlign: 'center', py: 8 }}>
@@ -137,6 +154,7 @@ export default function AdminPage() {
                 <Tab label={`Discussions (${discussions.length})`} />
                 <Tab label="Badges" />
                 <Tab label={`Audit Logs (${auditLogs.length})`} />
+                <Tab label="Manage Plans" />
             </Tabs>
 
             {tab === 0 && (
@@ -307,28 +325,91 @@ export default function AdminPage() {
                 </Card>
             )}
 
-            {tab === 7 && (
-                <TableContainer component={Card}>
-                    <Table size="small">
-                        <TableHead><TableRow>
-                            <TableCell>Action</TableCell><TableCell>Resource</TableCell><TableCell>User ID</TableCell><TableCell>IP</TableCell><TableCell>Created</TableCell>
-                        </TableRow></TableHead>
-                        <TableBody>
-                            {auditLogs.map(l => (
-                                <TableRow key={l.id}>
-                                    <TableCell>
-                                        <Chip size="small" label={l.action} 
-                                              color={l.action.includes('delete') ? 'error' : l.action.includes('create') ? 'success' : 'primary'} />
-                                    </TableCell>
-                                    <TableCell>{l.resource_type} {l.resource_id ? `(${l.resource_id.slice(0, 8)})` : ''}</TableCell>
-                                    <TableCell>{l.user_id ? l.user_id.slice(0, 8) : 'System'}</TableCell>
-                                    <TableCell>{l.ip_address || '—'}</TableCell>
-                                    <TableCell>{new Date(l.created_at).toLocaleString()}</TableCell>
-                                </TableRow>
+            {tab === 8 && pricingConfig && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <Card sx={{ p: 4 }}>
+                        <Typography variant="h6" gutterBottom fontWeight={800}>Tier Limits</Typography>
+                        <Typography variant="body2" color="text.secondary" mb={3}>Modify resource caps for each subscription level</Typography>
+                        
+                        <Grid container spacing={4}>
+                            {['free', 'pro', 'payg', 'enterprise'].map(tier => (
+                                <Grid size={{ xs: 12, md: 6 }} key={tier}>
+                                    <Box sx={{ p: 2, border: '1px solid #333', borderRadius: 2 }}>
+                                        <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2, textTransform: 'capitalize' }}>{tier} Limits</Typography>
+                                        <Grid container spacing={2}>
+                                            {Object.entries(pricingConfig.tier_limits[tier] || {}).map(([key, val]: [string, any]) => (
+                                                <Grid size={{ xs: 6 }} key={key}>
+                                                    <TextField
+                                                        fullWidth
+                                                        size="small"
+                                                        label={key.replace(/_/g, ' ')}
+                                                        type={typeof val === 'number' ? 'number' : 'text'}
+                                                        value={val}
+                                                        onChange={e => {
+                                                            const newLimits = { ...pricingConfig.tier_limits };
+                                                            newLimits[tier][key] = typeof val === 'number' ? Number(e.target.value) : e.target.value;
+                                                            setPricingConfig({ ...pricingConfig, tier_limits: newLimits });
+                                                        }}
+                                                    />
+                                                </Grid>
+                                            ))}
+                                        </Grid>
+                                    </Box>
+                                </Grid>
                             ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                        </Grid>
+                        <Button variant="contained" sx={{ mt: 3 }} onClick={() => savePricingConfig({ tier_limits: pricingConfig.tier_limits })}>Save Tier Limits</Button>
+                    </Card>
+
+                    <Card sx={{ p: 4 }}>
+                        <Typography variant="h6" gutterBottom fontWeight={800}>GPU Pricing (Hourly)</Typography>
+                        <Grid container spacing={2}>
+                            {Object.entries(pricingConfig.gpu_pricing || {}).map(([key, val]: [string, any]) => (
+                                <Grid size={{ xs: 12, md: 4 }} key={key}>
+                                    <Box sx={{ p: 2, border: '1px solid #333', borderRadius: 2 }}>
+                                        <Typography variant="subtitle2" gutterBottom>{key}</Typography>
+                                        <TextField
+                                            fullWidth
+                                            size="small"
+                                            label="Price (₹/hr)"
+                                            type="number"
+                                            value={val.per_hour}
+                                            onChange={e => {
+                                                const newGpu = { ...pricingConfig.gpu_pricing };
+                                                newGpu[key].per_hour = Number(e.target.value);
+                                                setPricingConfig({ ...pricingConfig, gpu_pricing: newGpu });
+                                            }}
+                                        />
+                                    </Box>
+                                </Grid>
+                            ))}
+                        </Grid>
+                        <Button variant="contained" sx={{ mt: 3 }} onClick={() => savePricingConfig({ gpu_pricing: pricingConfig.gpu_pricing })}>Save GPU Pricing</Button>
+                    </Card>
+
+                    <Card sx={{ p: 4 }}>
+                        <Typography variant="h6" gutterBottom fontWeight={800}>PAYG Unit Rates</Typography>
+                        <Grid container spacing={2}>
+                            {Object.entries(pricingConfig.payg_unit_pricing || {}).map(([key, val]: [string, any]) => (
+                                <Grid size={{ xs: 12, md: 3 }} key={key}>
+                                    <TextField
+                                        fullWidth
+                                        size="small"
+                                        label={key}
+                                        type="number"
+                                        value={val}
+                                        onChange={e => {
+                                            const newRates = { ...pricingConfig.payg_unit_pricing };
+                                            newRates[key] = Number(e.target.value);
+                                            setPricingConfig({ ...pricingConfig, payg_unit_pricing: newRates });
+                                        }}
+                                    />
+                                </Grid>
+                            ))}
+                        </Grid>
+                        <Button variant="contained" sx={{ mt: 3 }} onClick={() => savePricingConfig({ payg_unit_pricing: pricingConfig.payg_unit_pricing })}>Save Unit Rates</Button>
+                    </Card>
+                </Box>
             )}
         </Box>
     )

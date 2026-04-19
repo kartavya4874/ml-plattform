@@ -4,7 +4,7 @@ from typing import Optional, List
 from pydantic import BaseModel, Field
 import uuid
 from datetime import datetime
-from app.api.v1.auth import get_current_user
+from app.api.v1.auth import get_current_user, get_verified_user
 from app.models.models import User, Discussion, Comment, Vote
 
 router = APIRouter(prefix="/discussions", tags=["Discussions"])
@@ -44,7 +44,7 @@ class DiscussionOut(BaseModel):
     created_at: datetime
 
 @router.post("", response_model=DiscussionOut, status_code=201)
-async def create_discussion(body: DiscussionCreate, current_user: User = Depends(get_current_user)):
+async def create_discussion(body: DiscussionCreate, current_user: User = Depends(get_verified_user)):
     discussion = Discussion(
         author_id=current_user.id,
         title=body.title,
@@ -86,7 +86,7 @@ async def get_discussion(id: uuid.UUID, current_user: User = Depends(get_current
     return {**d.dict(), "comment_count": count, "user_voted": voted is not None}
 
 @router.post("/{discussion_id}/comments", response_model=CommentOut)
-async def add_comment(discussion_id: uuid.UUID, body: CommentCreate, current_user: User = Depends(get_current_user)):
+async def add_comment(discussion_id: uuid.UUID, body: CommentCreate, current_user: User = Depends(get_verified_user)):
     d = await Discussion.get(discussion_id)
     if not d: raise HTTPException(status_code=404, detail="Discussion not found")
     
@@ -133,7 +133,7 @@ async def get_comments(discussion_id: uuid.UUID, current_user: User = Depends(ge
     return roots
 
 @router.post("/{id}/upvote")
-async def upvote_discussion(id: uuid.UUID, current_user: User = Depends(get_current_user)):
+async def upvote_discussion(id: uuid.UUID, current_user: User = Depends(get_verified_user)):
     """Toggle upvote on a discussion. Returns new count and voted status."""
     d = await Discussion.get(id)
     if not d: raise HTTPException(status_code=404, detail="Discussion not found")
@@ -159,7 +159,7 @@ async def upvote_discussion(id: uuid.UUID, current_user: User = Depends(get_curr
         return {"upvotes": d.upvotes, "user_voted": True}
 
 @router.post("/comments/{id}/upvote")
-async def upvote_comment(id: uuid.UUID, current_user: User = Depends(get_current_user)):
+async def upvote_comment(id: uuid.UUID, current_user: User = Depends(get_verified_user)):
     """Toggle upvote on a comment. Returns new count and voted status."""
     c = await Comment.get(id)
     if not c: raise HTTPException(status_code=404, detail="Comment not found")

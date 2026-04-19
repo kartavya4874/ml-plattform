@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.models.models import User, MLModel, ModelStage
 from app.schemas.schemas import ModelOut, ModelUpdate
-from app.api.v1.auth import get_current_user
+from app.api.v1.auth import get_current_user, get_verified_user
 
 router = APIRouter(prefix="/models", tags=["Model Registry"])
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/models", tags=["Model Registry"])
 async def list_models(
     task_type: str | None = None,
     stage: str | None = None,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """List all trained models with optional filters (includes shared models)."""
     # Base query for owned or collaborated models
@@ -45,7 +45,7 @@ def _check_model_access(model: MLModel, user: User, requires_edit: bool = False)
 @router.get("/{model_id}", response_model=ModelOut)
 async def get_model(
     model_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Get full model details including metrics and artifact paths."""
     model = await MLModel.get(model_id)
@@ -59,7 +59,7 @@ async def get_model(
 async def update_model(
     model_id: uuid.UUID,
     body: ModelUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Update model name, description, visibility, tags."""
     model = await MLModel.get(model_id)
@@ -89,7 +89,7 @@ async def update_model(
 @router.delete("/{model_id}", status_code=204)
 async def delete_model(
     model_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Delete a model and its MinIO artifacts."""
     model = await MLModel.get(model_id)
@@ -113,7 +113,7 @@ async def delete_model(
 @router.get("/{model_id}/metrics")
 async def get_model_metrics(
     model_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Return full evaluation metrics for a model."""
     model = await MLModel.get(model_id)
@@ -126,7 +126,7 @@ async def get_model_metrics(
 @router.post("/{model_id}/promote", response_model=ModelOut)
 async def promote_model(
     model_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Promote a model from staging to production.
     
@@ -162,7 +162,7 @@ async def promote_model(
 @router.get("/{model_id}/download")
 async def download_model(
     model_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Download the trained model artifact (.pkl file)."""
     from fastapi.responses import Response

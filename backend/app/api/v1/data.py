@@ -10,7 +10,7 @@ from fastapi.responses import Response
 
 from app.models.models import User, Dataset, DatasetType
 from app.schemas.schemas import DatasetOut, DatasetDetail
-from app.api.v1.auth import get_current_user
+from app.api.v1.auth import get_current_user, get_verified_user
 from app.services.storage_service import StorageService
 from app.services.data_profiler import profile_dataset
 from app.services.quota_service import check_quota, increment_usage, get_user_tier, get_tier_limits
@@ -46,7 +46,7 @@ def _detect_dataset_type(filename: str, content_type: str) -> DatasetType:
 async def upload_dataset(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     storage: StorageService = Depends(StorageService.get_instance),
 ):
     """Upload a CSV, Excel, image ZIP, or text file."""
@@ -56,7 +56,7 @@ async def upload_dataset(
     # Validate file size
     content = await file.read()
     tier = await get_user_tier(current_user.id)
-    tier_limits = get_tier_limits(tier)
+    tier_limits = await get_tier_limits(tier)
     size_limit = _get_size_limit(current_user, tier_limits)
     if len(content) > size_limit:
         raise HTTPException(
@@ -295,7 +295,7 @@ async def transform_dataset(
     dataset_id: uuid.UUID,
     body: TransformRequest,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     storage: StorageService = Depends(StorageService.get_instance),
 ) -> dict[str, Any]:
     """Apply a pipeline of transformations to a dataset. Creates a new version."""
@@ -401,7 +401,7 @@ async def get_dataset_sample(
 async def auto_fix_dataset(
     dataset_id: uuid.UUID,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     storage: StorageService = Depends(StorageService.get_instance),
 ):
     """One-click auto-fix: handle missing values, encode categoricals, normalize numerics.
@@ -507,7 +507,7 @@ class FeatureImportanceRequest(BaseModel):
 async def compute_feature_importance(
     dataset_id: uuid.UUID,
     body: FeatureImportanceRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     storage: StorageService = Depends(StorageService.get_instance)
 ):
     """Compute feature importance using a fast RandomForest on a sample of data."""

@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 
 from app.models.models import User, Dataset, TrainingJob, JobStatus
 from app.schemas.schemas import TrainingJobCreate, TrainingJobOut
-from app.api.v1.auth import get_current_user
+from app.api.v1.auth import get_current_user, get_verified_user
 from app.services.quota_service import check_quota, increment_usage
 from app.core.config import settings
 from app.core.security import decode_token
@@ -31,7 +31,7 @@ async def get_redis_optional():
 @router.post("/jobs", response_model=TrainingJobOut, status_code=201)
 async def create_training_job(
     body: TrainingJobCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Submit a new training job."""
     # Check training job quota

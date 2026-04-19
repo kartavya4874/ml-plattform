@@ -11,7 +11,7 @@ from app.models.models import (
     User, Organization, OrgMembership, OrgInvite,
     SubscriptionTier,
 )
-from app.api.v1.auth import get_current_user
+from app.api.v1.auth import get_current_user, get_verified_user
 from app.services.quota_service import get_user_tier
 
 router = APIRouter(prefix="/orgs", tags=["Organizations"])
@@ -68,7 +68,7 @@ class WhitelabelUpdate(BaseModel):
 
 
 @router.post("", response_model=OrgOut, status_code=201)
-async def create_org(body: OrgCreate, current_user: User = Depends(get_current_user)):
+async def create_org(body: OrgCreate, current_user: User = Depends(get_verified_user)):
     # Lockdown: Only Enterprise users can create Organizations
     from app.services.quota_service import get_user_tier
     from app.models.models import SubscriptionTier
@@ -160,7 +160,7 @@ async def get_org_members(slug: str):
 async def update_email_domains(
     slug: str,
     body: EmailDomainsUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Set allowed email domains for the organization (Enterprise only)."""
     org = await Organization.find_one(Organization.slug == slug)
@@ -208,7 +208,7 @@ def _validate_email_domain(email: str, allowed_domains: List[str]) -> bool:
 async def invite_member(
     slug: str,
     body: InviteRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Send an invitation to join the organization."""
     org = await Organization.find_one(Organization.slug == slug)
@@ -316,7 +316,7 @@ async def list_invites(
 async def revoke_invite(
     slug: str,
     invite_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Revoke a pending invite."""
     org = await Organization.find_one(Organization.slug == slug)
@@ -340,7 +340,7 @@ async def revoke_invite(
 @router.post("/join/{invite_token}")
 async def accept_invite(
     invite_token: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Accept an organization invitation."""
     invite = await OrgInvite.find_one(OrgInvite.token == invite_token)
@@ -393,7 +393,7 @@ async def accept_invite(
 
 
 @router.post("/{slug}/members")
-async def add_member(slug: str, user_id: uuid.UUID, current_user: User = Depends(get_current_user)):
+async def add_member(slug: str, user_id: uuid.UUID, current_user: User = Depends(get_verified_user)):
     org = await Organization.find_one(Organization.slug == slug)
     if not org:
         raise HTTPException(404, "Organization not found")
@@ -428,7 +428,7 @@ async def add_member(slug: str, user_id: uuid.UUID, current_user: User = Depends
 
 
 @router.delete("/{slug}/members/{user_id}", status_code=204)
-async def remove_member(slug: str, user_id: uuid.UUID, current_user: User = Depends(get_current_user)):
+async def remove_member(slug: str, user_id: uuid.UUID, current_user: User = Depends(get_verified_user)):
     org = await Organization.find_one(Organization.slug == slug)
     if not org:
         raise HTTPException(404, "Organization not found")
@@ -462,7 +462,7 @@ async def get_whitelabel(slug: str):
 async def update_whitelabel(
     slug: str,
     body: WhitelabelUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Update white-label configuration (Enterprise only)."""
     org = await Organization.find_one(Organization.slug == slug)

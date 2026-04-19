@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from app.models.models import User, Competition, Submission, UserRole, Activity
-from app.api.v1.auth import get_current_user
+from app.api.v1.auth import get_current_user, get_verified_user
 
 router = APIRouter(prefix="/competitions", tags=["Competitions"])
 
@@ -69,7 +69,7 @@ def _require_admin(user: User):
 
 
 @router.post("", response_model=CompetitionOut, status_code=201)
-async def create_competition(body: CompetitionCreate, current_user: User = Depends(get_current_user)):
+async def create_competition(body: CompetitionCreate, current_user: User = Depends(get_verified_user)):
     _require_admin(current_user)
     comp = Competition(
         created_by=current_user.id, title=body.title, description=body.description,
@@ -96,7 +96,7 @@ async def get_competition(comp_id: uuid.UUID):
 
 
 @router.post("/{comp_id}/submit", response_model=SubmissionOut)
-async def submit_entry(comp_id: uuid.UUID, body: SubmissionCreate, current_user: User = Depends(get_current_user)):
+async def submit_entry(comp_id: uuid.UUID, body: SubmissionCreate, current_user: User = Depends(get_verified_user)):
     comp = await Competition.get(comp_id)
     if not comp:
         raise HTTPException(404, "Competition not found")
@@ -168,7 +168,7 @@ async def get_leaderboard(comp_id: uuid.UUID):
 
 
 @router.patch("/{comp_id}", response_model=CompetitionOut)
-async def update_competition(comp_id: uuid.UUID, current_user: User = Depends(get_current_user)):
+async def update_competition(comp_id: uuid.UUID, current_user: User = Depends(get_verified_user)):
     _require_admin(current_user)
     comp = await Competition.get(comp_id)
     if not comp:

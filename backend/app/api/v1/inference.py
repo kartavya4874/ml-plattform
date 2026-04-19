@@ -8,7 +8,7 @@ import io
 
 from app.models.models import User, MLModel, ModelStage
 from app.schemas.schemas import PredictionRequest, PredictionResponse
-from app.api.v1.auth import get_current_user
+from app.api.v1.auth import get_current_user, get_verified_user
 from app.services.inference_service import InferenceService
 from app.services.quota_service import check_quota, increment_usage
 
@@ -55,7 +55,7 @@ async def get_model_features(
 async def predict(
     model_id: uuid.UUID,
     body: PredictionRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     svc: InferenceService = Depends(get_inference_service),
 ):
     """Run a single prediction against a trained model."""
@@ -89,7 +89,7 @@ async def predict(
 async def batch_predict(
     model_id: uuid.UUID,
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     svc: InferenceService = Depends(get_inference_service),
 ):
     """Run batch predictions on a CSV or image zip and return enriched CSV."""

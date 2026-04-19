@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from app.models.models import User, Notebook, Activity, Dataset
-from app.api.v1.auth import get_current_user
+from app.api.v1.auth import get_current_user, get_verified_user
 from app.core.config import settings
 
 router = APIRouter(prefix="/notebooks", tags=["Notebooks"])
@@ -131,7 +131,7 @@ def _create_venv_if_needed(notebook_id: uuid.UUID) -> str:
 # ── CRUD ─────────────────────────────────────────────────────────────────────
 
 @router.post("", response_model=NotebookOut, status_code=201)
-async def create_notebook(body: NotebookCreate, current_user: User = Depends(get_current_user)):
+async def create_notebook(body: NotebookCreate, current_user: User = Depends(get_verified_user)):
     nb = Notebook(owner_id=current_user.id, title=body.title, description=body.description)
     await nb.insert()
     _get_workspace(nb.id)  # Create workspace dir
@@ -155,7 +155,7 @@ async def get_notebook(notebook_id: uuid.UUID, current_user: User = Depends(get_
 
 
 @router.put("/{notebook_id}", response_model=NotebookOut)
-async def update_notebook(notebook_id: uuid.UUID, body: NotebookUpdate, current_user: User = Depends(get_current_user)):
+async def update_notebook(notebook_id: uuid.UUID, body: NotebookUpdate, current_user: User = Depends(get_verified_user)):
     nb = await Notebook.get(notebook_id)
     if not nb:
         raise HTTPException(404, "Notebook not found")
@@ -174,7 +174,7 @@ async def update_notebook(notebook_id: uuid.UUID, body: NotebookUpdate, current_
 
 
 @router.delete("/{notebook_id}", status_code=204)
-async def delete_notebook(notebook_id: uuid.UUID, current_user: User = Depends(get_current_user)):
+async def delete_notebook(notebook_id: uuid.UUID, current_user: User = Depends(get_verified_user)):
     nb = await Notebook.get(notebook_id)
     if not nb:
         raise HTTPException(404, "Notebook not found")
@@ -190,7 +190,7 @@ async def delete_notebook(notebook_id: uuid.UUID, current_user: User = Depends(g
 # ── Execution ────────────────────────────────────────────────────────────────
 
 @router.post("/{notebook_id}/execute", response_model=CellExecuteResponse)
-async def execute_cell(notebook_id: uuid.UUID, body: CellExecuteRequest, current_user: User = Depends(get_current_user)):
+async def execute_cell(notebook_id: uuid.UUID, body: CellExecuteRequest, current_user: User = Depends(get_verified_user)):
     """Execute a single code cell using system Python (or notebook venv if extra packages installed)."""
     nb = await Notebook.get(notebook_id)
     if not nb:
@@ -247,7 +247,7 @@ async def execute_cell(notebook_id: uuid.UUID, body: CellExecuteRequest, current
 # ── Package Management ───────────────────────────────────────────────────────
 
 @router.post("/{notebook_id}/install")
-async def install_packages(notebook_id: uuid.UUID, body: InstallRequest, current_user: User = Depends(get_current_user)):
+async def install_packages(notebook_id: uuid.UUID, body: InstallRequest, current_user: User = Depends(get_verified_user)):
     """Install Python packages into a per-notebook venv.
     
     Creates the venv on first call with --system-site-packages so that
@@ -315,7 +315,7 @@ async def list_installed_packages(notebook_id: uuid.UUID, current_user: User = D
 # ── File Management ──────────────────────────────────────────────────────────
 
 @router.post("/{notebook_id}/files", response_model=NotebookFileOut)
-async def create_file(notebook_id: uuid.UUID, body: NotebookFileCreate, current_user: User = Depends(get_current_user)):
+async def create_file(notebook_id: uuid.UUID, body: NotebookFileCreate, current_user: User = Depends(get_verified_user)):
     """Create a Python/text file in the notebook workspace (for multi-file projects)."""
     nb = await Notebook.get(notebook_id)
     if not nb:
@@ -383,7 +383,7 @@ async def get_file_content(notebook_id: uuid.UUID, filename: str, current_user: 
 
 
 @router.put("/{notebook_id}/files/{filename}")
-async def update_file(notebook_id: uuid.UUID, filename: str, body: NotebookFileCreate, current_user: User = Depends(get_current_user)):
+async def update_file(notebook_id: uuid.UUID, filename: str, body: NotebookFileCreate, current_user: User = Depends(get_verified_user)):
     """Update content of a file in the workspace."""
     nb = await Notebook.get(notebook_id)
     if not nb:
@@ -398,7 +398,7 @@ async def update_file(notebook_id: uuid.UUID, filename: str, body: NotebookFileC
 
 
 @router.delete("/{notebook_id}/files/{filename}", status_code=204)
-async def delete_file(notebook_id: uuid.UUID, filename: str, current_user: User = Depends(get_current_user)):
+async def delete_file(notebook_id: uuid.UUID, filename: str, current_user: User = Depends(get_verified_user)):
     """Delete a file from the workspace."""
     nb = await Notebook.get(notebook_id)
     if not nb:
@@ -415,7 +415,7 @@ async def delete_file(notebook_id: uuid.UUID, filename: str, current_user: User 
 # ── Dataset Import ───────────────────────────────────────────────────────────
 
 @router.post("/{notebook_id}/import-dataset/{dataset_id}")
-async def import_dataset(notebook_id: uuid.UUID, dataset_id: uuid.UUID, current_user: User = Depends(get_current_user)):
+async def import_dataset(notebook_id: uuid.UUID, dataset_id: uuid.UUID, current_user: User = Depends(get_verified_user)):
     """Copy/link a dataset file into the notebook workspace so it can be loaded with pandas."""
     nb = await Notebook.get(notebook_id)
     if not nb:
@@ -445,7 +445,7 @@ async def import_dataset(notebook_id: uuid.UUID, dataset_id: uuid.UUID, current_
 
 
 @router.post("/{notebook_id}/import-model/{model_id}")
-async def import_model(notebook_id: uuid.UUID, model_id: uuid.UUID, current_user: User = Depends(get_current_user)):
+async def import_model(notebook_id: uuid.UUID, model_id: uuid.UUID, current_user: User = Depends(get_verified_user)):
     """Copy/link a model artifact file into the notebook workspace."""
     from app.models.models import MLModel
     nb = await Notebook.get(notebook_id)
@@ -480,7 +480,7 @@ async def import_model(notebook_id: uuid.UUID, model_id: uuid.UUID, current_user
 async def upload_file_to_notebook(
     notebook_id: uuid.UUID,
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Upload a file directly into the notebook workspace."""
     nb = await Notebook.get(notebook_id)
@@ -520,7 +520,7 @@ async def upload_file_to_notebook(
 async def import_ipynb(
     notebook_id: uuid.UUID,
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
 ):
     """Import a .ipynb file: parse its cells into the notebook."""
     import json as json_module
@@ -607,7 +607,7 @@ async def import_ipynb(
 # ── Fork ─────────────────────────────────────────────────────────────────────
 
 @router.post("/{notebook_id}/fork", response_model=NotebookOut)
-async def fork_notebook(notebook_id: uuid.UUID, current_user: User = Depends(get_current_user)):
+async def fork_notebook(notebook_id: uuid.UUID, current_user: User = Depends(get_verified_user)):
     nb = await Notebook.get(notebook_id)
     if not nb:
         raise HTTPException(404, "Notebook not found")
