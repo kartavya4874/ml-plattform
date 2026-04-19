@@ -38,6 +38,7 @@ import TermsOfServicePage from './pages/TermsOfServicePage'
 import RefundPolicyPage from './pages/RefundPolicyPage'
 import ContactUsPage from './pages/ContactUsPage'
 import ApiReferencePage from './pages/ApiReferencePage'
+import VerifyEmailPage from './pages/VerifyEmailPage'
 import CommandPalette from './components/CommandPalette'
 import ChatWidget from './components/ChatWidget'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -81,6 +82,7 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+      <Route path="/verify/:token" element={<VerifyEmailPage />} />
       <Route element={<PublicLayout />}>
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsOfServicePage />} />

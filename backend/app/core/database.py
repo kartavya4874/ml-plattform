@@ -96,6 +96,13 @@ async def seed_admins_from_env():
                 )
                 await admin_user.insert()
                 log.info("admin.seeded", email=email)
+            else:
+                # Ensure existing seeded admins are always verified and have admin role
+                if not existing.is_verified or existing.role != UserRole.admin:
+                    existing.is_verified = True
+                    existing.role = UserRole.admin
+                    await existing.save()
+                    log.info("admin.verified_existing", email=email)
         except Exception as e:
             log.error("admin.seed.failed", error=str(e), pair=pair)
 
