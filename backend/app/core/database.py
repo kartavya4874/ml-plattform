@@ -59,6 +59,7 @@ async def init_db():
         raise
     
     await seed_admins_from_env()
+    await migrate_pricing_config()
 
 async def seed_admins_from_env():
     """Seed initial admin users from environment variable ADMIN_USERS_SEED."""
@@ -105,6 +106,31 @@ async def seed_admins_from_env():
                     log.info("admin.verified_existing", email=email)
         except Exception as e:
             log.error("admin.seed.failed", error=str(e), pair=pair)
+
+async def migrate_pricing_config():
+    """Patch existing PricingConfig document to include gpu_enabled in pricing limits."""
+    import structlog
+    from app.models.models import PricingConfig
+    
+    log = structlog.get_logger()
+    try:
+        config = await PricingConfig.get("default_config")
+        if not config:
+            return
+        
+        gpu_defaults = {"free": False, "pro": True, "payg": True, "enterprise": True}
+        patched = False
+        
+        for tier_info in config.pricing_info:
+            if "limits" in tier_info and "gpu_enabled" not in tier_info["limits"]:
+                tier_info["limits"]["gpu_enabled"] = gpu_defaults.get(tier_info.get("tier", ""), False)
+                patched = True
+        
+        if patched:
+            await config.save()
+            log.info("migration.pricing_config_patched", detail="Added gpu_enabled to pricing limits")
+    except Exception as e:
+        log.warning("migration.pricing_config.skipped", error=str(e))
 
 async def close_db():
     """Close MongoDB connection."""

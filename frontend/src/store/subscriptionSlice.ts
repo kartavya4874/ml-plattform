@@ -140,6 +140,39 @@ const subscriptionSlice = createSlice({
             .addCase(fetchPricing.rejected, (state, action) => {
                 state.pricingLoading = false
                 state.error = action.payload as string
+                // Fallback pricing data so the page always renders
+                if (state.pricing.length === 0) {
+                    state.pricing = [
+                        {
+                            tier: 'free', name: 'Free', price_monthly: 0, price_label: '₹0',
+                            description: 'Perfect for exploring the platform and building your first models.',
+                            limits: { datasets: 10, max_file_size_mb: 100, training_jobs_per_month: 20, models: 10, deployments: 3, inference_requests_per_month: 5000, api_keys_per_model: 2 },
+                            features: ['10 datasets (up to 100 MB each)', '20 training jobs per month', '10 models', '3 deployments', '5,000 inference requests/month', 'Community support', 'Data profiling & quality reports'],
+                            is_popular: false,
+                        },
+                        {
+                            tier: 'pro', name: 'Pro', price_monthly: 2999, price_label: '₹2,999/mo',
+                            description: 'For professionals and teams building production ML pipelines.',
+                            limits: { datasets: 25, max_file_size_mb: 2048, training_jobs_per_month: 50, models: 20, deployments: 10, inference_requests_per_month: 50000, api_keys_per_model: 5 },
+                            features: ['25 datasets (up to 2 GB each)', '50 training jobs per month', '20 models & 10 deployments', '50,000 inference requests/month', 'GPU Training (T4 included)', 'Priority support', 'SHAP & explainability lab', 'Model export (ONNX / Docker)'],
+                            is_popular: true,
+                        },
+                        {
+                            tier: 'payg', name: 'Pay As You Go', price_monthly: 499, price_label: '₹499 base + usage',
+                            description: 'Pay only for what you use. Perfect for variable workloads.',
+                            limits: { datasets: 100, max_file_size_mb: 51200, training_jobs_per_month: 999999, models: 100, deployments: 50, inference_requests_per_month: 999999, api_keys_per_model: 20 },
+                            features: ['100 datasets (up to 50 GB each)', 'Unlimited training jobs (metered)', '100 models & 50 deployments', 'Unlimited inference (metered)', 'All GPU clusters available', '₹50/hr (T4) · ₹90/hr (A10G) · ₹200/hr (A100)', 'Scale-to-zero deployments', 'API calls: ₹0.001/request'],
+                            is_popular: false,
+                        },
+                        {
+                            tier: 'enterprise', name: 'Enterprise', price_monthly: 15999, price_label: '₹15,999/mo',
+                            description: 'Enterprise-grade features, custom limits, and dedicated support.',
+                            limits: { datasets: 999999, max_file_size_mb: 51200, training_jobs_per_month: 999999, models: 999999, deployments: 999999, inference_requests_per_month: 999999, api_keys_per_model: 999999 },
+                            features: ['Unlimited datasets & storage', 'Unlimited models & deployments', 'SLA-backed priority support', 'Organization management', 'White-labeling & custom branding', 'Audit logs & compliance', 'Dedicated solutions architect', 'SSO Integration'],
+                            is_popular: false,
+                        },
+                    ]
+                }
             })
             .addCase(upgradeTier.pending, (state) => { state.upgrading = true; state.error = null })
             .addCase(upgradeTier.fulfilled, (state) => { state.upgrading = false })

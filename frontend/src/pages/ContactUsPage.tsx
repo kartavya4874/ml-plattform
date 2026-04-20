@@ -147,6 +147,9 @@ export default function ContactUsPage() {
                     <Typography variant="h6" sx={{ color: theme.palette.text.secondary, fontWeight: 400, maxWidth: 600, mx: 'auto' }}>
                         Have a question, feedback, or need help? We'd love to hear from you. Our team typically responds within 24–48 hours.
                     </Typography>
+                    <Typography variant="body1" sx={{ color: theme.palette.text.secondary, mt: 2 }}>
+                        Built by <strong style={{ color: theme.palette.text.primary }}>Kartavya Baluja</strong> — Founder, Parametrix AI
+                    </Typography>
                 </Box>
 
                 {/* Contact Cards */}
@@ -264,8 +267,11 @@ export default function ContactUsPage() {
 
             {/* Footer */}
             <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, py: 4, px: 3, textAlign: 'center' }}>
-                <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 0.5 }}>
                     © {new Date().getFullYear()} {COMPANY_NAME}. All rights reserved.
+                </Typography>
+                <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                    Founded by <strong>Kartavya Baluja</strong>
                 </Typography>
             </Box>
 

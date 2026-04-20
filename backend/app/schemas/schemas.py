@@ -337,7 +337,7 @@ class TierLimitInfo(BaseModel):
     deployments: int
     inference_requests_per_month: int
     api_keys_per_model: int
-    gpu_enabled: bool
+    gpu_enabled: bool = False
 
 
 class PricingTierInfo(BaseModel):

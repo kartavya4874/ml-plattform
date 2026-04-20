@@ -88,6 +88,7 @@ DEFAULT_PRICING_INFO = [
             "deployments": 3,
             "inference_requests_per_month": 5_000,
             "api_keys_per_model": 2,
+            "gpu_enabled": False,
         },
         "features": [
             "10 datasets (up to 100 MB each)",
@@ -114,6 +115,7 @@ DEFAULT_PRICING_INFO = [
             "deployments": 10,
             "inference_requests_per_month": 50_000,
             "api_keys_per_model": 5,
+            "gpu_enabled": True,
         },
         "features": [
             "25 datasets (up to 2 GB each)",
@@ -141,6 +143,7 @@ DEFAULT_PRICING_INFO = [
             "deployments": 50,
             "inference_requests_per_month": 999_999,
             "api_keys_per_model": 20,
+            "gpu_enabled": True,
         },
         "features": [
             "100 datasets (up to 50 GB each)",
@@ -168,6 +171,7 @@ DEFAULT_PRICING_INFO = [
             "deployments": 999_999,
             "inference_requests_per_month": 999_999,
             "api_keys_per_model": 999_999,
+            "gpu_enabled": True,
         },
         "features": [
             "Unlimited datasets & storage",
@@ -207,6 +211,11 @@ async def get_dynamic_tier_limits():
 
 async def get_dynamic_pricing_info():
     cfg = await load_pricing_config()
+    # Ensure gpu_enabled exists in each tier's limits (backward compat with old DB docs)
+    gpu_defaults = {"free": False, "pro": True, "payg": True, "enterprise": True}
+    for tier_info in cfg.pricing_info:
+        if "limits" in tier_info and "gpu_enabled" not in tier_info["limits"]:
+            tier_info["limits"]["gpu_enabled"] = gpu_defaults.get(tier_info.get("tier", ""), False)
     return cfg.pricing_info
 
 async def get_dynamic_gpu_pricing():
