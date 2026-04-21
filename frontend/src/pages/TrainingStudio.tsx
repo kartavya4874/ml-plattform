@@ -343,7 +343,7 @@ export default function TrainingStudio() {
                                     {/* Data Preview Table */}
                                     <Collapse in={showPreview} timeout={400}>
                                         {sampleData.length > 0 && (
-                                            <Card sx={{ borderRadius: '12px', overflow: 'hidden', mb: 2 }}>
+                                            <Card sx={{ borderRadius: '12px', overflow: 'hidden', mb: 2, width: '100%', maxWidth: '100%' }}>
                                                 <Box sx={{
                                                     px: 2, py: 1.5,
                                                     background: 'rgba(99,102,241,0.06)',

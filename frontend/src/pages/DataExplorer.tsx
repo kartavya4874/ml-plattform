@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useDropzone } from 'react-dropzone'
 import {
     Box, Typography, Card, Chip, LinearProgress,
-    Table, TableBody, TableCell, TableHead, TableRow,
+    Table, TableBody, TableCell, TableHead, TableRow, TableContainer,
     IconButton, Tooltip, Alert, CircularProgress, Snackbar, Button,
     Dialog, DialogTitle, DialogContent, DialogActions, TextField
 } from '@mui/material'
@@ -138,145 +138,149 @@ export default function DataExplorer() {
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>Upload your first dataset to get started</Typography>
                 </Box>
             ) : (
-                <Card>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                {['Name', 'Type', 'Size', 'Rows', 'Quality', 'Visibility', 'Status', 'Actions'].map(h => (
-                                    <TableCell key={h} sx={{ fontWeight: 600, color: 'text.secondary', fontSize: 12, letterSpacing: 0.5 }}>
-                                        {h.toUpperCase()}
-                                    </TableCell>
-                                ))}
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {datasets.map((ds) => (
-                                <TableRow key={ds.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/data/${ds.id}`)}>
-                                    <TableCell>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <Typography variant="body2" fontWeight={600}>{ds.name}</Typography>
-                                            <Chip label={`v${ds.version || 1}`} size="small" sx={{ height: 18, fontSize: 10, fontWeight: 700, background: 'rgba(99,102,241,0.12)', color: '#818CF8' }} />
-                                        </Box>
-                                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                            {new Date(ds.created_at).toLocaleDateString()}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: typeColors[ds.dataset_type] || '#6B7280' }}>
-                                            {typeIcons[ds.dataset_type]}
-                                            <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>{ds.dataset_type}</Typography>
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell><Typography variant="body2">{formatBytes(ds.file_size_bytes)}</Typography></TableCell>
-                                    <TableCell><Typography variant="body2">{ds.row_count?.toLocaleString() ?? '—'}</Typography></TableCell>
-                                    <TableCell>
-                                        {ds.quality_score != null ? (
+            ) : (
+                <Card sx={{ overflowX: 'auto', width: '100%' }}>
+                    <TableContainer>
+                        <Table>
+                            <TableHead>
+                                <TableRow>
+                                    {['Name', 'Type', 'Size', 'Rows', 'Quality', 'Visibility', 'Status', 'Actions'].map(h => (
+                                        <TableCell key={h} sx={{ fontWeight: 600, color: 'text.secondary', fontSize: 12, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>
+                                            {h.toUpperCase()}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {datasets.map((ds) => (
+                                    <TableRow key={ds.id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/data/${ds.id}`)}>
+                                        <TableCell sx={{ minWidth: 200 }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <LinearProgress
-                                                    variant="determinate"
-                                                    value={ds.quality_score}
-                                                    sx={{ width: 60, height: 4, borderRadius: 2 }}
-                                                />
-                                                <Typography variant="caption">{ds.quality_score}%</Typography>
+                                                <Typography variant="body2" fontWeight={600} noWrap>{ds.name}</Typography>
+                                                <Chip label={`v${ds.version || 1}`} size="small" sx={{ height: 18, fontSize: 10, fontWeight: 700, background: 'rgba(99,102,241,0.12)', color: '#818CF8' }} />
                                             </Box>
-                                        ) : '—'}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Chip
-                                            label={ds.status}
-                                            size="small"
-                                            sx={{
-                                                background: `${statusColors[ds.status] || '#6B7280'}15`,
-                                                color: statusColors[ds.status] || '#6B7280',
-                                                border: `1px solid ${statusColors[ds.status] || '#6B7280'}30`,
-                                                fontSize: 11,
-                                            }}
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Chip
-                                            icon={ds.is_public ? <PublicIcon sx={{ fontSize: 14 }} /> : <PrivateIcon sx={{ fontSize: 14 }} />}
-                                            label={ds.is_public ? 'Public' : 'Private'}
-                                            size="small"
-                                            variant="outlined"
-                                            onClick={async (e) => {
-                                                e.stopPropagation()
-                                                if (!ds.is_public) {
-                                                    // Prompt for description
-                                                    setPublishDialog({ id: ds.id, name: ds.name, description: ds.description || '' })
-                                                } else {
-                                                    // Make Private immediately
-                                                    await api.patch(`/data/datasets/${ds.id}`, { is_public: false })
-                                                    dispatch(fetchDatasets())
-                                                }
-                                            }}
-                                            sx={{ cursor: 'pointer', color: ds.is_public ? '#10B981' : '#6B7280', borderColor: ds.is_public ? '#10B98130' : '#6B728030' }}
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                                            <Tooltip title="View · EDA · Transform">
-                                                <IconButton
-                                                    size="small"
-                                                    sx={{ color: '#6366F1' }}
-                                                    onClick={(e) => { e.stopPropagation(); navigate(`/data/${ds.id}`) }}
-                                                >
-                                                    <EdaIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                            {ds.dataset_type === 'tabular' && (
-                                                <Tooltip title="Auto-fix: fill nulls, remove duplicates">
+                                            <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                                                {new Date(ds.created_at).toLocaleDateString()}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: typeColors[ds.dataset_type] || '#6B7280' }}>
+                                                {typeIcons[ds.dataset_type]}
+                                                <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>{ds.dataset_type}</Typography>
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell sx={{ whiteSpace: 'nowrap' }}><Typography variant="body2">{formatBytes(ds.file_size_bytes)}</Typography></TableCell>
+                                        <TableCell sx={{ whiteSpace: 'nowrap' }}><Typography variant="body2">{ds.row_count?.toLocaleString() ?? '—'}</Typography></TableCell>
+                                        <TableCell sx={{ minWidth: 100 }}>
+                                            {ds.quality_score != null ? (
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <LinearProgress
+                                                        variant="determinate"
+                                                        value={ds.quality_score}
+                                                        sx={{ width: 60, height: 4, borderRadius: 2 }}
+                                                    />
+                                                    <Typography variant="caption">{ds.quality_score}%</Typography>
+                                                </Box>
+                                            ) : '—'}
+                                        </TableCell>
+                                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                            <Chip
+                                                label={ds.status}
+                                                size="small"
+                                                sx={{
+                                                    background: `${statusColors[ds.status] || '#6B7280'}15`,
+                                                    color: statusColors[ds.status] || '#6B7280',
+                                                    border: `1px solid ${statusColors[ds.status] || '#6B7280'}30`,
+                                                    fontSize: 11,
+                                                }}
+                                            />
+                                        </TableCell>
+                                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                            <Chip
+                                                icon={ds.is_public ? <PublicIcon sx={{ fontSize: 14 }} /> : <PrivateIcon sx={{ fontSize: 14 }} />}
+                                                label={ds.is_public ? 'Public' : 'Private'}
+                                                size="small"
+                                                variant="outlined"
+                                                onClick={async (e) => {
+                                                    e.stopPropagation()
+                                                    if (!ds.is_public) {
+                                                        // Prompt for description
+                                                        setPublishDialog({ id: ds.id, name: ds.name, description: ds.description || '' })
+                                                    } else {
+                                                        // Make Private immediately
+                                                        await api.patch(`/data/datasets/${ds.id}`, { is_public: false })
+                                                        dispatch(fetchDatasets())
+                                                    }
+                                                }}
+                                                sx={{ cursor: 'pointer', color: ds.is_public ? '#10B981' : '#6B7280', borderColor: ds.is_public ? '#10B98130' : '#6B728030' }}
+                                            />
+                                        </TableCell>
+                                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                                                <Tooltip title="View · EDA · Transform">
                                                     <IconButton
                                                         size="small"
-                                                        sx={{ color: '#10B981' }}
-                                                        disabled={autoFixing === ds.id}
-                                                        onClick={async (e) => {
-                                                            e.stopPropagation()
-                                                            setAutoFixing(ds.id)
-                                                            try {
-                                                                const res = await api.post(`/data/datasets/${ds.id}/auto-fix`)
-                                                                setSnackMsg(res.data.message)
-                                                                dispatch(fetchDatasets())
-                                                            } catch (err: any) {
-                                                                setSnackMsg(err.response?.data?.detail || 'Auto-fix failed')
-                                                            }
-                                                            setAutoFixing(null)
-                                                        }}
+                                                        sx={{ color: '#6366F1' }}
+                                                        onClick={(e) => { e.stopPropagation(); navigate(`/data/${ds.id}`) }}
                                                     >
-                                                        {autoFixing === ds.id ? <CircularProgress size={16} /> : <AutoFixIcon fontSize="small" />}
+                                                        <EdaIcon fontSize="small" />
                                                     </IconButton>
                                                 </Tooltip>
-                                            )}
-                                            <Tooltip title="Download">
-                                                <IconButton
-                                                    size="small"
-                                                    sx={{ color: '#8B5CF6' }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        const token = localStorage.getItem('access_token')
-                                                        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
-                                                        window.open(`${baseUrl}/data/datasets/${ds.id}/download?token=${token}`, '_blank')
-                                                    }}
-                                                >
-                                                    <DownloadIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                            <Tooltip title="Delete dataset">
-                                                <IconButton
-                                                    size="small"
-                                                    sx={{ color: 'error.main' }}
-                                                    onClick={(e) => { e.stopPropagation(); dispatch(deleteDataset(ds.id)) }}
-                                                >
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                        </Box>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                                                {ds.dataset_type === 'tabular' && (
+                                                    <Tooltip title="Auto-fix: fill nulls, remove duplicates">
+                                                        <IconButton
+                                                            size="small"
+                                                            sx={{ color: '#10B981' }}
+                                                            disabled={autoFixing === ds.id}
+                                                            onClick={async (e) => {
+                                                                e.stopPropagation()
+                                                                setAutoFixing(ds.id)
+                                                                try {
+                                                                    const res = await api.post(`/data/datasets/${ds.id}/auto-fix`)
+                                                                    setSnackMsg(res.data.message)
+                                                                    dispatch(fetchDatasets())
+                                                                } catch (err: any) {
+                                                                    setSnackMsg(err.response?.data?.detail || 'Auto-fix failed')
+                                                                }
+                                                                setAutoFixing(null)
+                                                            }}
+                                                        >
+                                                            {autoFixing === ds.id ? <CircularProgress size={16} /> : <AutoFixIcon fontSize="small" />}
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+                                                <Tooltip title="Download">
+                                                    <IconButton
+                                                        size="small"
+                                                        sx={{ color: '#8B5CF6' }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            const token = localStorage.getItem('access_token')
+                                                            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+                                                            window.open(`${baseUrl}/data/datasets/${ds.id}/download?token=${token}`, '_blank')
+                                                        }}
+                                                    >
+                                                        <DownloadIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Delete dataset">
+                                                    <IconButton
+                                                        size="small"
+                                                        sx={{ color: 'error.main' }}
+                                                        onClick={(e) => { e.stopPropagation(); dispatch(deleteDataset(ds.id)) }}
+                                                    >
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </Box>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
                 </Card>
+            )}
             )}
 
             {/* Publish Dialog */}
