@@ -225,15 +225,6 @@ export default function PricingPage() {
         }
     }, [dispatch, token])
 
-    useEffect(() => {
-        if (checkoutParams) {
-            // Give react a tick to render the form, then submit it
-            setTimeout(() => {
-                const form = document.getElementById('payu-form') as HTMLFormElement;
-                if (form) form.submit();
-            }, 500);
-        }
-    }, [checkoutParams])
 
     const handleUpgrade = (tier: string) => {
         setPhoneNumber('');
@@ -248,10 +239,33 @@ export default function PricingPage() {
             return;
         }
         setPhoneDialog({ open: false, tier: '' });
+        
+        // Show loading backdrop
+        setCheckoutParams({ loading: true }); 
+
         try {
             const { data } = await api.get(`/subscription/payu/checkout-params?tier=${phoneDialog.tier}&phone=${cleaned}`);
-            setCheckoutParams(data);
+            
+            // Programmatically construct and fire form to prevent React lifecycle double-POSTs
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = data.actionUrl;
+            form.style.display = 'none';
+            
+            Object.keys(data).forEach(key => {
+                if (key !== 'actionUrl' && data[key] !== null) {
+                    const hiddenField = document.createElement('input');
+                    hiddenField.type = 'hidden';
+                    hiddenField.name = key;
+                    hiddenField.value = data[key];
+                    form.appendChild(hiddenField);
+                }
+            });
+            
+            document.body.appendChild(form);
+            form.submit();
         } catch (e: any) {
+            setCheckoutParams(null);
             alert(e.response?.data?.detail || "Failed to initiate payment gateway");
         }
     }
@@ -294,20 +308,6 @@ export default function PricingPage() {
                 <Backdrop open={true} sx={{ zIndex: 9999, flexDirection: 'column', color: '#fff' }}>
                     <CircularProgress color="inherit" sx={{ mb: 2 }} />
                     <Typography variant="h6" fontWeight={600}>Redirecting to PayU Secure Gateway...</Typography>
-                    <form id="payu-form" action={checkoutParams.actionUrl} method="POST" style={{ display: "none" }}>
-                        <input type="hidden" name="key" value={checkoutParams.key} />
-                        <input type="hidden" name="txnid" value={checkoutParams.txnid} />
-                        <input type="hidden" name="amount" value={checkoutParams.amount} />
-                        <input type="hidden" name="productinfo" value={checkoutParams.productinfo} />
-                        <input type="hidden" name="firstname" value={checkoutParams.firstname} />
-                        <input type="hidden" name="email" value={checkoutParams.email} />
-                        <input type="hidden" name="phone" value={checkoutParams.phone} />
-                        <input type="hidden" name="surl" value={checkoutParams.surl} />
-                        <input type="hidden" name="furl" value={checkoutParams.furl} />
-                        <input type="hidden" name="hash" value={checkoutParams.hash} />
-                        <input type="hidden" name="udf1" value={checkoutParams.udf1} />
-                        <input type="hidden" name="udf2" value={checkoutParams.udf2} />
-                    </form>
                 </Backdrop>
             )}
 

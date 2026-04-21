@@ -190,18 +190,22 @@ async def payu_checkout_params(
     }
 
 
-@router.post("/payu/callback")
+@router.api_route("/payu/callback", methods=["GET", "POST"])
 async def payu_callback(request: Request):
     """
-    Handle POST callback from PayU after transaction.
+    Handle POST/GET callback from PayU after transaction.
     Must verify hash heavily.
     """
     import structlog
     log = structlog.get_logger()
     
     try:
-        form_data = dict(await request.form())
-        log.info("payu.callback_received", txnid=form_data.get("txnid"), status=form_data.get("status"))
+        if request.method == "GET":
+            form_data = dict(request.query_params)
+        else:
+            form_data = dict(await request.form())
+            
+        log.info("payu.callback_received", txnid=form_data.get("txnid"), status=form_data.get("status"), method=request.method)
     except Exception as e:
         log.error("payu.callback_data_error", error=str(e))
         return RedirectResponse(f"{settings.FRONTEND_URL}/dashboard?payment=error&reason=data_parsing", status_code=303)
