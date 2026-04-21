@@ -126,6 +126,7 @@ async def upgrade_subscription(
 @router.get("/payu/checkout-params")
 async def payu_checkout_params(
     tier: str,
+    phone: str = "9999999999",
     current_user: User = Depends(get_current_user),
 ):
     """Generate and return required hidden fields for PayU JS form submission."""
@@ -140,20 +141,31 @@ async def payu_checkout_params(
         raise HTTPException(status_code=400, detail="Cannot downgrade or re-subscribe to current tier.")
 
     # Find the tier pricing
-    price_str = "0.0"
+    raw_price = 0.0
     pricing_info = await get_dynamic_pricing_info()
     for pt in pricing_info:
         if pt["tier"] == new_tier.value:
-            price_str = str(float(pt["price_monthly"]))
+            raw_price = float(pt["price_monthly"])
             break
 
-    if float(price_str) == 0.0:
+    if raw_price == 0.0:
         raise HTTPException(status_code=400, detail="Free tier does not require payment.")
 
+    # PayU requires amount with exactly 2 decimal places
+    price_str = f"{raw_price:.2f}"
+
     txnid = generate_txnid()
-    productinfo = f"Parametrix AI - {new_tier.value.capitalize()} Tier"
+    # PayU recommends alphanumeric productinfo (no special chars)
+    productinfo = f"Parametrix AI {new_tier.value.capitalize()} Plan"
     firstname = current_user.full_name or "User"
     email = current_user.email
+    
+    # Validate phone — PayU live UPI requires a valid 10-digit Indian mobile number
+    phone_clean = "".join(c for c in phone if c.isdigit())
+    if len(phone_clean) > 10:
+        phone_clean = phone_clean[-10:]  # strip country code
+    if len(phone_clean) != 10:
+        phone_clean = "9999999999"  # fallback for test mode
     
     # Store critical metadata into User Defined Fields so we know who to upgrade on success
     udf1 = str(current_user.id)
@@ -169,7 +181,7 @@ async def payu_checkout_params(
         "productinfo": productinfo,
         "firstname": firstname,
         "email": email,
-        "phone": "9999999999", # Dummy phone for test env
+        "phone": phone_clean,
         "surl": f"{settings.API_BASE_URL}/api/v1/subscription/payu/callback",
         "furl": f"{settings.API_BASE_URL}/api/v1/subscription/payu/callback",
         "udf1": udf1,

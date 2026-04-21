@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import {
     Box, Typography, Card, CardContent, Button, Chip, Divider, Grid,
-    CircularProgress, Backdrop
+    CircularProgress, Backdrop, Dialog, DialogTitle, DialogContent, DialogActions, TextField
 } from '@mui/material'
 import {
     Check as CheckIcon,
@@ -214,6 +214,9 @@ export default function PricingPage() {
     const token = useSelector((s: RootState) => s.auth.accessToken)
 
     const [checkoutParams, setCheckoutParams] = useState<any>(null);
+    const [phoneDialog, setPhoneDialog] = useState<{ open: boolean; tier: string }>({ open: false, tier: '' });
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [phoneError, setPhoneError] = useState('');
 
     useEffect(() => {
         dispatch(fetchPricing())
@@ -232,9 +235,21 @@ export default function PricingPage() {
         }
     }, [checkoutParams])
 
-    const handleUpgrade = async (tier: string) => {
+    const handleUpgrade = (tier: string) => {
+        setPhoneNumber('');
+        setPhoneError('');
+        setPhoneDialog({ open: true, tier });
+    }
+
+    const handlePhoneSubmit = async () => {
+        const cleaned = phoneNumber.replace(/\D/g, '');
+        if (cleaned.length !== 10) {
+            setPhoneError('Please enter a valid 10-digit mobile number');
+            return;
+        }
+        setPhoneDialog({ open: false, tier: '' });
         try {
-            const { data } = await api.get(`/subscription/payu/checkout-params?tier=${tier}`);
+            const { data } = await api.get(`/subscription/payu/checkout-params?tier=${phoneDialog.tier}&phone=${cleaned}`);
             setCheckoutParams(data);
         } catch (e: any) {
             alert(e.response?.data?.detail || "Failed to initiate payment gateway");
@@ -244,6 +259,36 @@ export default function PricingPage() {
     return (
         <Box className="fade-in" sx={{ maxWidth: 1200, mx: 'auto' }}>
             
+            {/* Phone Number Dialog */}
+            <Dialog open={phoneDialog.open} onClose={() => setPhoneDialog({ open: false, tier: '' })} maxWidth="xs" fullWidth>
+                <DialogTitle sx={{ fontWeight: 700 }}>📱 Enter Your Mobile Number</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        PayU requires a valid Indian mobile number for UPI and payment verification.
+                    </Typography>
+                    <TextField
+                        autoFocus fullWidth
+                        label="Mobile Number"
+                        placeholder="9876543210"
+                        value={phoneNumber}
+                        onChange={e => {
+                            setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10));
+                            setPhoneError('');
+                        }}
+                        error={!!phoneError}
+                        helperText={phoneError || '10-digit Indian mobile number'}
+                        inputProps={{ maxLength: 10, inputMode: 'numeric' }}
+                        sx={{ mt: 1 }}
+                    />
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                    <Button onClick={() => setPhoneDialog({ open: false, tier: '' })}>Cancel</Button>
+                    <Button variant="contained" onClick={handlePhoneSubmit} disabled={phoneNumber.length !== 10}>
+                        Proceed to Payment
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
             {/* PayU Overlay */}
             {checkoutParams && (
                 <Backdrop open={true} sx={{ zIndex: 9999, flexDirection: 'column', color: '#fff' }}>
