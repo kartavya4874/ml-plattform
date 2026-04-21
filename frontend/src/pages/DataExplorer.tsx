@@ -138,7 +138,6 @@ export default function DataExplorer() {
                     <Typography variant="body2" sx={{ color: 'text.secondary' }}>Upload your first dataset to get started</Typography>
                 </Box>
             ) : (
-            ) : (
                 <Card sx={{ overflowX: 'auto', width: '100%' }}>
                     <TableContainer>
                         <Table>
@@ -280,7 +279,6 @@ export default function DataExplorer() {
                         </Table>
                     </TableContainer>
                 </Card>
-            )}
             )}
 
             {/* Publish Dialog */}
