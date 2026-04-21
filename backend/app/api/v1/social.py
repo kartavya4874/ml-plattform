@@ -165,6 +165,18 @@ async def fork_resource(resource_type: str, resource_id: uuid.UUID, current_user
     if not original.is_public and original.owner_id != current_user.id:
         raise HTTPException(403, "Cannot fork a private resource")
 
+    # Idempotency check: Prevent double-forking if the UI double-posts or user clicks quickly
+    existing_fork = await Fork.find_one(
+        Fork.original_id == resource_id,
+        Fork.forked_by == current_user.id
+    )
+    if existing_fork:
+        # Verify the forked resource wasn't deleted by the user previously
+        exists = await model_cls.get(existing_fork.forked_id)
+        if exists:
+            return {"forked_id": str(exists.id), "message": "Already forked"}
+        # If it was deleted, allow re-forking by continuing
+
     # Create a copy based on type
     if resource_type == "dataset":
         copy = Dataset(

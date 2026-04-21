@@ -241,8 +241,11 @@ async def delete_dataset(
         usage.storage_bytes_used = max(0, usage.storage_bytes_used - dataset.file_size_bytes)
         await usage.save()
 
-    # Delete from MinIO
-    await storage.delete_object(settings.R2_BUCKET_DATA, dataset.minio_path)
+    # Check if this minio_path is shared by any other dataset (e.g. forks)
+    shared_count = await Dataset.find(Dataset.minio_path == dataset.minio_path).count()
+    if shared_count <= 1:
+        # Delete from MinIO only if we are the last reference
+        await storage.delete_object(settings.R2_BUCKET_DATA, dataset.minio_path)
 
     await dataset.delete()
 
@@ -375,7 +378,13 @@ async def get_dataset_eda(
     if dataset.dataset_type != "tabular":
         raise HTTPException(status_code=400, detail="EDA only supported for tabular datasets")
 
-    df = await load_dataset_df(dataset)
+    try:
+        df = await load_dataset_df(dataset)
+    except ValueError as e:
+        if "NoSuchKey" in str(e):
+            raise HTTPException(status_code=404, detail="Dataset file missing from storage (likely deleted)")
+        raise HTTPException(status_code=500, detail=str(e))
+        
     eda = await asyncio.get_event_loop().run_in_executor(None, compute_eda, df)
     return eda
 
@@ -394,7 +403,13 @@ async def get_dataset_sample(
         raise HTTPException(status_code=404, detail="Dataset not found")
     _check_dataset_access(dataset, current_user)
 
-    df = await load_dataset_df(dataset)
+    try:
+        df = await load_dataset_df(dataset)
+    except ValueError as e:
+        if "NoSuchKey" in str(e):
+            raise HTTPException(status_code=404, detail="Dataset file missing from storage (likely deleted)")
+        raise HTTPException(status_code=500, detail=str(e))
+        
     return get_sample_data(df, rows=rows)
 
 
