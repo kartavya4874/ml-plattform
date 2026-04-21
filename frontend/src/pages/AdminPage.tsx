@@ -327,8 +327,113 @@ export default function AdminPage() {
 
             {tab === 8 && pricingConfig && (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {/* ── Plan Pricing & Details ─────────────────────────────── */}
                     <Card sx={{ p: 4 }}>
-                        <Typography variant="h6" gutterBottom fontWeight={800}>Tier Limits</Typography>
+                        <Typography variant="h6" gutterBottom fontWeight={800}>💰 Plan Pricing & Details</Typography>
+                        <Typography variant="body2" color="text.secondary" mb={3}>Edit monthly prices, labels, descriptions, and feature lists for each plan</Typography>
+
+                        <Grid container spacing={3}>
+                            {(pricingConfig.pricing_info || []).map((plan: any, idx: number) => (
+                                <Grid size={{ xs: 12, md: 6 }} key={plan.tier}>
+                                    <Box sx={{ p: 3, border: '1px solid #333', borderRadius: 2, position: 'relative' }}>
+                                        {plan.is_popular && (
+                                            <Chip label="Popular" color="primary" size="small" sx={{ position: 'absolute', top: 8, right: 8 }} />
+                                        )}
+                                        <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2, textTransform: 'capitalize' }}>
+                                            {plan.tier} Plan
+                                        </Typography>
+                                        <Grid container spacing={2}>
+                                            <Grid size={{ xs: 6 }}>
+                                                <TextField
+                                                    fullWidth size="small"
+                                                    label="Plan Name"
+                                                    value={plan.name}
+                                                    onChange={e => {
+                                                        const updated = [...pricingConfig.pricing_info];
+                                                        updated[idx] = { ...updated[idx], name: e.target.value };
+                                                        setPricingConfig({ ...pricingConfig, pricing_info: updated });
+                                                    }}
+                                                />
+                                            </Grid>
+                                            <Grid size={{ xs: 6 }}>
+                                                <TextField
+                                                    fullWidth size="small"
+                                                    label="Monthly Price (₹)"
+                                                    type="number"
+                                                    value={plan.price_monthly}
+                                                    onChange={e => {
+                                                        const updated = [...pricingConfig.pricing_info];
+                                                        updated[idx] = { ...updated[idx], price_monthly: Number(e.target.value) };
+                                                        setPricingConfig({ ...pricingConfig, pricing_info: updated });
+                                                    }}
+                                                />
+                                            </Grid>
+                                            <Grid size={{ xs: 6 }}>
+                                                <TextField
+                                                    fullWidth size="small"
+                                                    label="Price Label (display)"
+                                                    value={plan.price_label}
+                                                    helperText='e.g. "₹2,999/mo"'
+                                                    onChange={e => {
+                                                        const updated = [...pricingConfig.pricing_info];
+                                                        updated[idx] = { ...updated[idx], price_label: e.target.value };
+                                                        setPricingConfig({ ...pricingConfig, pricing_info: updated });
+                                                    }}
+                                                />
+                                            </Grid>
+                                            <Grid size={{ xs: 6 }}>
+                                                <Select
+                                                    fullWidth size="small"
+                                                    value={plan.is_popular ? 'yes' : 'no'}
+                                                    onChange={e => {
+                                                        const updated = [...pricingConfig.pricing_info];
+                                                        updated[idx] = { ...updated[idx], is_popular: e.target.value === 'yes' };
+                                                        setPricingConfig({ ...pricingConfig, pricing_info: updated });
+                                                    }}
+                                                >
+                                                    <MenuItem value="yes">⭐ Popular Badge: Yes</MenuItem>
+                                                    <MenuItem value="no">Popular Badge: No</MenuItem>
+                                                </Select>
+                                            </Grid>
+                                            <Grid size={{ xs: 12 }}>
+                                                <TextField
+                                                    fullWidth size="small"
+                                                    label="Description"
+                                                    value={plan.description}
+                                                    onChange={e => {
+                                                        const updated = [...pricingConfig.pricing_info];
+                                                        updated[idx] = { ...updated[idx], description: e.target.value };
+                                                        setPricingConfig({ ...pricingConfig, pricing_info: updated });
+                                                    }}
+                                                />
+                                            </Grid>
+                                            <Grid size={{ xs: 12 }}>
+                                                <TextField
+                                                    fullWidth size="small"
+                                                    label="Features (one per line)"
+                                                    multiline
+                                                    minRows={3}
+                                                    maxRows={8}
+                                                    value={(plan.features || []).join('\n')}
+                                                    helperText="Each line = one bullet point on the pricing page"
+                                                    onChange={e => {
+                                                        const updated = [...pricingConfig.pricing_info];
+                                                        updated[idx] = { ...updated[idx], features: e.target.value.split('\n') };
+                                                        setPricingConfig({ ...pricingConfig, pricing_info: updated });
+                                                    }}
+                                                />
+                                            </Grid>
+                                        </Grid>
+                                    </Box>
+                                </Grid>
+                            ))}
+                        </Grid>
+                        <Button variant="contained" sx={{ mt: 3 }} onClick={() => savePricingConfig({ pricing_info: pricingConfig.pricing_info })}>Save Plan Pricing</Button>
+                    </Card>
+
+                    {/* ── Tier Limits ────────────────────────────────────────── */}
+                    <Card sx={{ p: 4 }}>
+                        <Typography variant="h6" gutterBottom fontWeight={800}>📊 Tier Limits</Typography>
                         <Typography variant="body2" color="text.secondary" mb={3}>Modify resource caps for each subscription level</Typography>
                         
                         <Grid container spacing={4}>
@@ -361,8 +466,9 @@ export default function AdminPage() {
                         <Button variant="contained" sx={{ mt: 3 }} onClick={() => savePricingConfig({ tier_limits: pricingConfig.tier_limits })}>Save Tier Limits</Button>
                     </Card>
 
+                    {/* ── GPU Pricing ────────────────────────────────────────── */}
                     <Card sx={{ p: 4 }}>
-                        <Typography variant="h6" gutterBottom fontWeight={800}>GPU Pricing (Hourly)</Typography>
+                        <Typography variant="h6" gutterBottom fontWeight={800}>🖥️ GPU Pricing (Hourly)</Typography>
                         <Grid container spacing={2}>
                             {Object.entries(pricingConfig.gpu_pricing || {}).map(([key, val]: [string, any]) => (
                                 <Grid size={{ xs: 12, md: 4 }} key={key}>
@@ -387,8 +493,9 @@ export default function AdminPage() {
                         <Button variant="contained" sx={{ mt: 3 }} onClick={() => savePricingConfig({ gpu_pricing: pricingConfig.gpu_pricing })}>Save GPU Pricing</Button>
                     </Card>
 
+                    {/* ── PAYG Unit Rates ────────────────────────────────────── */}
                     <Card sx={{ p: 4 }}>
-                        <Typography variant="h6" gutterBottom fontWeight={800}>PAYG Unit Rates</Typography>
+                        <Typography variant="h6" gutterBottom fontWeight={800}>⚡ PAYG Unit Rates</Typography>
                         <Grid container spacing={2}>
                             {Object.entries(pricingConfig.payg_unit_pricing || {}).map(([key, val]: [string, any]) => (
                                 <Grid size={{ xs: 12, md: 3 }} key={key}>
