@@ -21,7 +21,7 @@ def verify_payu_hash(form_data: dict) -> bool:
     PayU Format returned: sha512(SALT|status||||||udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key)
     """
     status = form_data.get("status", "")
-    key = form_data.get("key", "")
+    key = form_data.get("key", settings.PAYU_KEY.strip())
     txnid = form_data.get("txnid", "")
     amount = form_data.get("amount", "")
     productinfo = form_data.get("productinfo", "")
@@ -33,17 +33,28 @@ def verify_payu_hash(form_data: dict) -> bool:
     udf4 = form_data.get("udf4", "")
     udf5 = form_data.get("udf5", "")
     
+    salt = settings.PAYU_SALT.strip()
+    
     # Check if a custom 'additionalCharges' was applied by payU (rare, but mandated by docs to check)
     additional_charges = form_data.get("additionalCharges")
     
     if additional_charges:
-        hash_sequence = f"{additional_charges}|{settings.PAYU_SALT}|{status}||||||{udf5}|{udf4}|{udf3}|{udf2}|{udf1}|{email}|{firstname}|{productinfo}|{amount}|{txnid}|{settings.PAYU_KEY}"
+        hash_sequence = f"{additional_charges}|{salt}|{status}||||||{udf5}|{udf4}|{udf3}|{udf2}|{udf1}|{email}|{firstname}|{productinfo}|{amount}|{txnid}|{key}"
     else:
-        hash_sequence = f"{settings.PAYU_SALT}|{status}||||||{udf5}|{udf4}|{udf3}|{udf2}|{udf1}|{email}|{firstname}|{productinfo}|{amount}|{txnid}|{settings.PAYU_KEY}"
+        hash_sequence = f"{salt}|{status}||||||{udf5}|{udf4}|{udf3}|{udf2}|{udf1}|{email}|{firstname}|{productinfo}|{amount}|{txnid}|{key}"
         
     calculated_hash = hashlib.sha512(hash_sequence.encode('utf-8')).hexdigest().lower()
     received_hash = form_data.get("hash", "").lower()
     
+    if calculated_hash != received_hash:
+        import structlog
+        log = structlog.get_logger()
+        log.warning("payu.hash_mismatch_debug", 
+            calculated=calculated_hash, 
+            received=received_hash, 
+            sequence=hash_sequence, 
+            form_data=form_data)
+            
     return calculated_hash == received_hash
 
 def get_payu_endpoint() -> str:
