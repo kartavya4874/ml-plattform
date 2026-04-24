@@ -107,7 +107,7 @@ const AnimatedChartUI = () => {
         }}>
             <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2, color: theme.palette.text.primary }}>Model Accuracy Convergence</Typography>
             <Box sx={{ flex: 1, width: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                     <AreaChart data={chartData}>
                         <defs>
                             <linearGradient id="colorAcc" x1="0" y1="0" x2="0" y2="1">
@@ -328,7 +328,7 @@ export default function LandingPage() {
                                             Instantly visualize correlations, detect outliers, and prepare your tabular data or images for training.
                                         </Typography>
                                         <Box sx={{ flex: 1, width: '100%', minHeight: 250, background: isDark ? '#000' : '#F9F9F9', borderRadius: 4, p: 2, border: `1px solid ${theme.palette.divider}` }}>
-                                            <ResponsiveContainer width="100%" height="100%">
+                                            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                                                 <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                                                     <XAxis type="number" dataKey="x" name="stature" hide />
                                                     <YAxis type="number" dataKey="y" name="weight" hide />

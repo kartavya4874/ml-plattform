@@ -104,7 +104,7 @@ export default function ExplainabilityLab() {
                         <Card>
                             <CardContent sx={{ p: 3 }}>
                                 <Typography variant="body2" fontWeight={600} mb={2}>Feature Importance (Mean |SHAP|)</Typography>
-                                <ResponsiveContainer width="100%" height={Math.max(300, globalShap.feature_names.length * 30)}>
+                                <ResponsiveContainer width="100%" height={Math.max(300, globalShap.feature_names.length * 30)} minWidth={1}>
                                     <BarChart
                                         layout="vertical"
                                         data={globalShap.feature_names.map((f: string, i: number) => ({ name: f, value: globalShap.mean_abs_shap[i] }))}
@@ -167,7 +167,7 @@ export default function ExplainabilityLab() {
                                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>Base value: {localShap.base_value?.toFixed(4)}</Typography>
                                 </Box>
                                 <Typography variant="body2" fontWeight={600} mb={1}>SHAP Waterfall</Typography>
-                                <ResponsiveContainer width="100%" height={Math.max(250, localShap.feature_names.length * 28)}>
+                                <ResponsiveContainer width="100%" height={Math.max(250, localShap.feature_names.length * 28)} minWidth={1}>
                                     <BarChart
                                         layout="vertical"
                                         data={localShap.feature_names.map((f: string, i: number) => ({

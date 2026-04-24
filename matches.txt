@@ -1,0 +1,230 @@
+eate Payload Fill form data or use sample data 2 Generate Hash Use Show Debug Info to verify 3 Post Request Use Pay Now to test journey Configuration Settings Cross-Border Payment Alert: Ensure your PayU acc
+ is enforced: Use Udf update API with respect to the paymode. UDF1 - PAN & DOB (Required if AD bank requests) 0/255 Format: PAN||DOB (DD/MM/YYYY) UDF2 - Additional Info (Optional) 0/255 UDF3 - Invoice ID & M
+eate Payload Fill form data or use sample data 2 Generate Hash Use Show Debug Info to verify 3 Post Request Use Pay Now to test journey Configuration Settings PreBuilt Checkout: PayU's standard checkout page
+eate Payload Fill form data or use sample data 2 Generate Hash Use Show Debug Info to verify 3 Post Request Use Pay Now to test journey Configuration Settings Subscription/Recurring Payment: This flow is for
+eate Payload Fill form data or use sample data 2 Generate Hash Use Show Debug Info to verify 3 Post Request Use Pay Now to test journey Configuration Settings TPV Payment: Third Party Verification for Net Ba
+eate Payload Fill form data or use sample data 2 Generate Hash Use Show Debug Info to verify 3 Post Request Use Pay Now to test journey Configuration Settings UPI One Time Mandate: Create a one-time pre-auth
+eate Payload Fill form data or use sample data 2 Generate Hash Use Show Debug Info to verify 3 Post Request Use Pay Now to test journey Configuration Settings Pre-Authorization Payment: Amount will be blocke
+eate Payload Fill form data or use sample data 2 Generate Hash Use Show Debug Info to verify 3 Post Request Use Pay Now to test journey Configuration Settings Checkout Plus: JavaScript SDK-based payment with
+eate Payload Fill form data or use sample data 2 Generate Hash Use Show Debug Info to verify 3 Post Request Use Pay Now to test journey Configuration Settings About Split Payment: Distribute a single transac
+eate Payload Fill form data or use sample data 2 Generate Hash Use Show Debug Info to verify 3 Post Request Use Pay Now to test journey Configuration Settings About Bank Offers: Test instant discount and cas
+s developers face during UPI seamless integration — causes, detection, and step-by-step fixes. Hash errors • VPA issues • Pending payments Open Guide → 📱 PayU UPI Simulator App Install the PayU UPI Intent 
+ductinfo|firstname|email|udf1-5||||||salt 3 POST to PayU _payment API Merchant server sends payment request with pg=UPI , bankcode=INTENT , and txn_s2s_flow=4 . 4 PayU returns deeplink PayU responds with a U
+fic (target app), or Smart (auto-detect). This determines the bankcode you send. 2 Send the payment request POST to _payment with pg=UPI , txn_s2s_flow=4 , and your chosen bankcode . Use the Initiate Payment
+→ 3 Build Deeplink → 4 Generate QR Code → 5 Customer Scans & Pays → 6 Verify Payment 1 Send Payment Request POST to _payment with these key parameters for Generic Intent: Generic Intent Parameters Copy pg=UP
+andle the result in onActivityResult . Kotlin – onActivityResult Copy override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+    super.onActivityResult(requestCode, resultCode, data)
+    if (requestCode == 101) {
+andle the result in onActivityResult . Kotlin – onActivityResult Copy override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+    super.onActivityResult(requestCode, resultCode, data)
+    if (requestCode == 101) {
+ handle. Mandatory for UPI Collect flow customer@upi udf1 Conditional String — Mandatory if AD bank requests this detail. Must contain Buyer's PAN and DOB: PAN||DOB AAAPZ1234C||22/08/1972 udf2 Optional Strin
+g — User-defined field 2 udf3 Conditional String — Mandatory if AD bank requests this detail. Must contain Invoice ID and Merchant Name: InvoiceID||MerchantName INV-123_1231||Merc
+4F||1990-01-01||INV123456||MerchantName||||||||hKvGJP28d2ZUuCRz5BnDag58QBdCxBli) Try It — Send Real Request Mandatory Parameters Merchant Key * Merchant Salt * Transaction ID (txnid) * New Txn ID Amount * Pr
+er Type Business B2B Not Applicable (default: 0) 1 — Buyer is a Business ⚡ Fill Sample Data Preview Request Send to PayU → Request Sent Copy Response Received Copy 📳 UPI QR Code — Scan to Pay Generated from 
+ dates configured How It Works 1 Merchant Sends mandate → 2 PayU API _payment → 3 UPI Switch Routes request → 4 Customer Approves Mandate → 5 Mandate Active Recurring ready Step-by-Step Guide 1 Prepare manda
+ow=4 , and api_version=7 . 5 Customer approves the mandate The customer receives a mandate approval request on their UPI app. Once approved, the mandate becomes active and recurring debits can be triggered. 
+r UPI regardless of the amount passed. 1 udf1 Conditional PAN||Date of Birth — Mandatory if AD bank requests this detail ABCDE1234F||1990-01-01 udf3 Conditional Invoice ID||Merchant Name — Mandatory if AD ba
+nk requests this detail INV123456||MerchantName si_details JSON Parameters Field Required Description Example 
+Autopay (Standing Instruction) mandate registration requires the amount to be greater than ₹2 INR . Requests with amount ≤ ₹2 will fail. The default sample amount is set to ₹1,000 . ⚠ Transaction Amount ≤ Bi
+tration will succeed and the customer can approve the mandate via their UPI app. Try It — Send Real Request Mandatory Parameters Merchant Key (key) * Merchant Salt * Transaction ID (txnid) * New Txn ID Amoun
+_trial ) (UPI amount adjusted to ₹2) -- Not Set -- 1 (Enable Free Trial) ⚡ Fill Sample Data Preview Request Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Cop
+ Merchant Key (key) * Merchant Salt * Transaction ID (txnid) * Command * ⚡ Fill Sample Data Preview Request Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Cop
+ (mihpayid) The PayU ID from the mandate registration response How It Works 1 Merchant Sends status request → 2 PayU API postservice.php → 3 UPI Network Checks mandate → 4 Status Returned Active / Paused / R
+(this is your authPayuId ). 2 Build the var1 JSON Create a JSON object with authPayuId and a unique requestId . 3 Generate the hash Compute sha512(key|command|var1|salt) where command is upi_mandate_status .
+ PayU dashboard a4vGC2 command Yes API command upi_mandate_status var1 Yes JSON with authPayuId and requestId {"authPayuId":"...","requestId":"..."} hash Yes SHA-512 hash (computed) var1 JSON for upi_mandate
+  "requestId": "1892432asds15g6"
+sha512(merchantKey|upi_mandate_status|{"authPayuId":"...","requestId":"..."}|merchantSalt) Try It — Get Mandate Status Mandatory Parameters Merchant Key (key) * Merch
+ant Salt * authPayuId (mihpayid) * Request ID * ⚡ Fill Sample Data Preview Request Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Copy Next: Modify Mandate 
+ate the billing amount and/or the end date of the mandate. The customer will receive a modification request on their UPI app which they must approve. This uses POST to postservice.php with SHA-512 hash authe
+response ✓ New Amount or End Date At least one field to modify How It Works 1 Merchant Sends modify request → 2 PayU API postservice.php → 3 UPI Network Routes to bank → 4 Customer Approves modification → 5 
+gistration or verify payment response. 2 Build the var1 JSON Create a JSON object with authPayuId , requestId , and the fields to modify: amount and/or endDate . 3 Generate the hash Compute sha512(key|comman
+ Send key, command, var1 (JSON string), and hash. The customer will receive a modification approval request on their UPI app. API Reference Parameter Required Description Example key Yes Merchant key from Pa
+2 command Yes API command upi_mandate_modify var1 Yes JSON with modify details {"authPayuId":"...","requestId":"...","amount":"...","endDate":"..."} hash Yes SHA-512 hash (computed) var1 JSON for upi_mandate
+  "requestId": "403993715921",
+sha512(merchantKey|upi_mandate_modify|{"authPayuId":"...","requestId":"...","amount":"...","endDate":"..."}|merchantSalt) Try It — Modify UPI Mandate Mandatory Parame
+ters Merchant Key (key) * Merchant Salt * authPayuId (mihpayid) * Request ID * Optional Parameters New Amount New End Date ⚡ Fill Sample Data Preview Request Send to PayU → 
+Request Sent Copy Response Received Copy Understanding the Response cURL Command Copy Next: Pre-Debit Notif
+tures). 📖 PayU Official Documentation Docs UPI Intent One-Time Mandate (OTM) — Pre-auth transaction request, capture flow, multi-capture, status check & cancel integration. → Prerequisites ✓ Merchant Key & S
+lly multiCapture: "Y" How It Works 1 Merchant Sends OTM → 2 PayU API _payment → 3 UPI Switch Routes request → 4 Amount Blocked In customer a/c → 5 Capture Later Full / Partial Step-by-Step Guide 1 Choose cap
+ed by PayU during onboarding a4vGC2 salt Mandatory Merchant salt for hash generation (never sent in request) mGHSxpD2iB… txnid Mandatory Unique transaction/order ID (auto-generated if empty) OTM_17345678 amo
+18,000). The auth will succeed, and the capture will also complete successfully. Try It — Send Real Request Mandatory Parameters Merchant Key (key) * Merchant Salt * Transaction ID (txnid) * New Txn ID Amoun
+nfo) * Optional Parameters Last Name (lastname) udf1 udf2 udf3 udf4 udf5 ⚡ Fill Sample Data Preview Request Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Cop
+uthorized amount) How It Works 1 Auth Transaction Pre-authorize → 2 Verify Get mihpayid → 3 Capture Request postservice → 4 Amount Debited From customer Step-by-Step Guide 1 Complete an auth (pre-authorize) 
+ha512(key|command|var1|salt) where command= capture_transaction and var1= mihpayid . 4 POST capture request Send key , command , var1 (mihpayid), var2 (unique capture order ID), var3 (capture amount), and ha
+sha512(merchantKey|capture_transaction|mihpayid|merchantSalt) Try It — Send Real Request Mandatory Parameters Merchant Key (key) * Merchant Salt * mihpayid (Auth PayU ID) * Capture Order I
+D * Capture Amount * Command * ⚡ Fill Sample Data Preview Request Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Copy Next: Verify Payment 
+Compute sha512(key|command|var1|salt) where command= verify_payment and var1= txnid . 3 POST verify request Send key , command , var1 (txnid), and hash to postservice.php . 4 Process the response Extract mih
+. 5 Confirm or reject order Based on the verified status, fulfill the order (if success) or show an error (if failure/pending). API Reference Parameter Required Description Example key Mandatory Merchant k
+ PayU during onboarding a4vGC2 salt Mandatory Merchant salt used for hash generation (never sent in request) mGHSxpD2iB… command Mandatory API command — fixed verify_payment verify_payment var1 Mandatory Tra
+sha512(a4vGC2|verify_payment|TXN_1234567890|hKvGJP28d2ZUuCRz5BnDag58QBdCxBli) Try It — Send Real Request Mandatory Parameters Merchant Key (key) * Merchant Salt * Transaction ID (var1) * Command * ⚡ Fill 
+Sample Data Preview Request Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Copy ✓ Flow Completed — Ba
+ed by PayU during onboarding a4vGC2 salt Mandatory Merchant salt for hash generation (never sent in request) mGHSxpD2iB… command Mandatory API command — fixed cancel_refund_transaction cancel_refund_transact
+2|cancel_refund_transaction|403993715537142566|hKvGJP28d2ZUuCRz5BnDag58QBdCxBli) Try It — Send Real Request Mandatory Parameters Merchant Key (key) * Merchant Salt * mihpayid (var1) * Cancel Amount (var3) * 
+Cancel Token ID (var2) * Command * ⚡ Fill Sample Data Preview Request Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Copy Next: Check Action St
+atus → Check Action Status Overview Use check_action_status to track the status of a cancel/refund request. After initiating a cancel or refund via cancel_refund_transaction , this API lets you check whethe
+ed by PayU during onboarding a4vGC2 salt Mandatory Merchant salt for hash generation (never sent in request) mGHSxpD2iB… command Mandatory API command — fixed check_action_status check_action_status var1 Man
+sha512(a4vGC2|check_action_status|139210626|hKvGJP28d2ZUuCRz5BnDag58QBdCxBli) Try It — Send Real Request Mandatory Parameters Merchant Key (key) * Merchant Salt * PayU ID / mihpayid (var1) * Command * ⚡ F
+ill Sample Data Preview Request Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Copy ✓ Flow Completed — Ba
+action — releases the blocked amount How It Works 1 Transaction Auth/Capture done → 2 Cancel/Refund Request postservice → 3 PayU Processes Refund initiated → 4 Status Updated check_action_status Step-by-Step
+. 3 Generate cancel hash Compute sha512(key|command|var1|salt) where var1= mihpayid . 4 POST cancel request Send the request to postservice.php with all required parameters including a unique cancel token ID
+. 5 Check refund status Use check_action_status with the request_id to track the refund progress. API Reference — Cancel Transaction Parameter Required Description 
+ --data-urlencode "var1={{request_id}}" \
+ --data-urlencode "hash={{hash}}" Try It — Send Real Request Mandatory Parameters Merchant Key (key) * Merchant Salt * mihpayid (Auth PayU ID) * Command * Cance
+l Token ID * Cancel Amount * ⚡ Fill Data Preview Request Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Copy Next: OTM Status Chec
+Is, it uses HMAC-SHA256 signature-based authentication (not the standard SHA-512 hash). It is a GET request to the PayU API endpoint. The proxy handles HMAC header generation server-side, so you only need to
+rify_payment How It Works 1 Get mihpayid From verify → 2 Generate HMAC Headers SHA-256 auth → 3 GET Request API endpoint → 4 OTM Status Response Step-by-Step Guide 1 Get the mihpayid Use verify_payment or ex
+ Date (UTC), Digest (SHA-256 of empty body, base64), and Authorization (HMAC signature). 3 Send GET request Call https://apitest.payu.in/v1/transaction/upi_otm_status_check?payuId={{payuid}} with the HMAC he
+ HMAC-SHA256 signature Date Yes UTC date header Tue, 23 Sep 2025 06:58:08 GMT Digest Yes SHA-256 of request body (empty for GET), base64 47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU= Authorization Yes HMAC si
+const requestBody = "";  // empty for GET
+const bodyHash = crypto.createHash('sha256').update(requestBody).digest('base64');
+//   Content-Type: application/json Try It — Send Real Request Mandatory Parameters Merchant Key (key) * Merchant Salt * PayU ID (mihpayid) * Auth Method * ⚡ Fill
+ Sample Data Preview Request Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Copy Next: Capture Transac
+apture. Hash Formula Verify Auth Hash Copy sha512(key|verify_payment|txnid|salt) Try It — Send Real Request Mandatory Parameters Merchant Key (key) * Merchant Salt * Transaction ID (txnid) * Command * Previe
+w Request Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Copy ⚡ Choose your next st
+ calling capture_transaction , verify the capture using the capture_order_id (var2 from the capture request) to confirm the amount was debited successfully. Hash Formula Verify Capture Hash Copy sha512(key|v
+erify_payment|capture_order_id|salt) Try It — Send Real Request Mandatory Parameters Merchant Key (key) * Merchant Salt * Capture Order ID * Command * Preview Requ
+est Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Copy Next: Cancel Transact
+oard a4vGC2 command Yes API command pre_debit_SI var1 Yes JSON with pre-debit details: authPayuId , requestId , debitDate (YYYY-MM-DD), amount {"authPayuId":"...","requestId":"...","debitDate":"...","amount"
+  "requestId": "403993715534484661_1",
+sha512(merchantKey|pre_debit_SI|{"authPayuId":"...","requestId":"...","debitDate":"...","amount":"..."}|merchantSalt) Try It — Pre-Debit Notification Mandatory 
+Parameters Merchant Key (key) * Merchant Salt * authPayuId (mihpayid) * Request ID * Debit Date * Amount * Optional Parameters Invoice Display Number ⚡ Fill Sample Data Preview Re
+quest Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Copy Next: SI Transaction 
+ Address Line 1 Address Line 2 City State Country Zipcode UDF2 UDF4 UDF5 ⚡ Fill Sample Data Preview Request Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Cop
+alt Your PayU test/UAT credentials ✓ SI Transaction ID (txnid) The txnid used in the SI Transaction request How It Works 1 SI Transaction Debit executed → 2 Verify Payment postservice.php → 3 Response Status
+ Guide 1 Get the SI txnid Use the same transaction ID ( txnid ) that was used in the si_transaction request. 2 Generate the hash Compute sha512(key|command|var1|salt) where command is verify_payment and var1
+rchant Key (key) * Merchant Salt * SI Transaction ID (txnid) * Command * ⚡ Fill Sample Data Preview Request Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Cop
+_s2s_flow=4 for Intent ✓ Polling Strategy verify_payment every 5-10s for pending Quick Diagnostic 1 Error Message Read the error → 2 Identify Category Hash / VPA / Flow → 3 Follow Fix Steps See accordion b
+elow → 4 Re-test Validate the fix ❌ Hash Mismatch Error ▼ Causes Incorrect salt being used (use Salt v1, not v2) Wrong parameter order in hash string Extra
+pes before salt: |||||| ) Amount format mismatch (e.g., "10" vs "10.00") How to Detect PayU returns error message "Hash validation failed" or "Sorry, Some Problem Occurred" . How to Fix Debug Hash Copy // 
+ank handle) Bank-side rejection or temporarily unavailable handle How to Detect Payment API returns error with invalid VPA message. How to Fix Verify the VPA format is correct ( username@handle ) before in
+itiating payment. Show user-friendly error if VPA is invalid. ⚠ Payment Stuck in Pending ▼ Causes UPI collect request timed out (customer didn
+ent polling: Check payment status every 5-10 seconds for up to 5 minutes Set UPI expiry time in the request using expiryTime parameter Show appropriate "Payment Processing" UI to the customer ⚠ Deeplink / QR
+ is not available ❌ txn_s2s_flow Parameter Missing ▼ Causes Forgot to include txn_s2s_flow=4 in the request Using wrong value (must be 4 for UPI Intent S2S) How to Detect PayU redirects to its payment page i
+nstead of returning a deeplink, or returns an error. How to Fix Always include txn_s2s_flow=4 in your payment request for UPI Intent S2S flow. Quick Re
+ference: Error Codes Error Meaning Fix Hash validation failed Incorrect hash Check salt version, parameter order Invalid VPA V
+atory Merchant key provided by PayU JPg****f command Mandatory getBinInfo getBinInfo var1 Mandatory Request type: 1 = single BIN lookup, 2 = feature-based BIN list, 3 = all BIN information 1 var2 Conditional
+ce Custom Range 3 501 50 0 Cards 501–550 Mandatory Parameters Merchant Key * Merchant Salt * var1 – Request Type * 1 = Single BIN lookup var2 – BIN / Feature Code BIN number (first 6–9 digits) for single loo
+e zero redirect & SI support Set to 1 for additional fields like is_zero_redirect_supported Preview Request Send getBinInfo Request Request Sent Copy Response Received Copy cURL Command Copy Response Paramet
+lt * var1 – Card BIN (first 6 digits) * Enter exactly the first 6 digits of the card number Preview Request Send check_isDomestic Request Request Sent Copy Response Received Copy cURL Command Copy Next: Init
+iate Payment → Payment: Execute the Transaction Send the card payment request to _payment and handle 3DS via acsTemplate and optional OTP submission. Inputs required 1 Card data
+API, you must generate a SHA-512 hash . This hash ensures that no one has tampered with the payment request parameters. It acts as a digital signature between your server and PayU. Hash Formula for _payment 
+on, always compute the hash on your server. 4 Card Payment API ( _payment ) Submit the card payment request with all card details, S2S flow parameters, and the generated hash. The txn_s2s_flow=4 parameter en
+=1 Required if store_card=1 . Format: merchantKey:uniqueCustomerId Optional Parameters (included in request only if filled) Address Line 1 (address1) recommended Address Line 2 (address2) City recommended St
+ate Country recommended Zipcode UDF1 UDF2 UDF3 UDF4 UDF5 Last Name (lastname) Preview Request Send to PayU Request Sent Copy Response Received Copy Understanding the Response cURL Command Copy 
+Template . Customer completes OTP on bank site. ⏳ Waiting for payment response… Send a card payment request in the previous step. The authentication options will appear here automatically. ① Native OTP — Sub
+lback page. ⚠ No ACS template received yet. This will load automatically after you send the payment request in the previous step. 🔒 ACS Template Decode Guide The acsTemplate is a Base64-encoded HTML string .
+</body></html> ⚠ Troubleshooting OTP Errors E2502 “Payu unable to parse ACS page for native” — PayU test environment issue. Retry or use a dif
+ck — network issues can cause missed callbacks. You can verify multiple transaction IDs in a single request by separating them with a pipe ( | ). POST https://test.payu.in/merchant/postservice.php?form=2 Con
+ payer’s card for up to 7 days . Funds are not debited at this stage. Capture A capture_transaction request debits the funds from the payer’s card. You can capture the full amount or a partial amount (partia
+to Capture PayU automatically captures the authorized amount on the 7th day if no capture or cancel request is received. Merchants can opt for Auto Cancel or set a custom auto-capture window. Cancel Cancel a
+le partial captures Note: PayU does not support multiple partial captures on a single authorization request. After a partial amount is captured, the remaining balance is cancelled immediately. If no action i
+: generate the correct payment hash first. The pre_authorize=1 flag is included only in the payment request. Key steps 1 getBinInfo BIN capabilities 2 Payment hash SHA-512 hash for _payment 1 Get BIN Info AP
+atory Merchant key provided by PayU JPg****f command Mandatory getBinInfo getBinInfo var1 Mandatory Request type: 1 = single BIN, 2 = feature-based list, 3 = all BINs 1 var2 Conditional If var1=1: BIN number
+ce Custom Range 3 501 50 0 Cards 501–550 Mandatory Parameters Merchant Key * Merchant Salt * var1 – Request Type * 1 = Single BIN lookup var2 – BIN / Feature Code BIN number (first 6–9 digits) for single loo
+0 – Standard response 1 – Include zero redirect & SI support Set to 1 for additional fields Preview Request Send getBinInfo Request Sent Copy Response Received Copy cURL Command Copy Response Parameters — Us
+=1 , you must generate a SHA-512 hash . This hash ensures that no one has tampered with the payment request parameters. The hash formula is identical to a normal payment. Hash Formula for Pre-Auth _payment A
+on your server. 3 Pre-Auth Payment API ( _payment with pre_authorize=1 ) Submit a pre-authorization request to hold funds on the customer’s card without debiting. The pre_authorize=1 parameter is the only di
+on) Must be 1 for pre-authorization. Holds funds without debiting. Optional Parameters (included in request only if filled) Address Line 1 Address Line 2 City State Country Zipcode UDF1 UDF2 UDF3 UDF4 UDF5 P
+review Request Send Pre-Auth to PayU Request Sent Copy Response Received Copy cURL Command Copy 4 Handle 3DS / Submit OTP After the payment API 
+late . Customer completes OTP on bank site. ⏳ Waiting for payment response… Send a pre-auth payment request in the previous step. The authentication options will appear here automatically. ① Native OTP — Sub
+lback page. ⚠ No ACS template received yet. This will load automatically after you send the payment request in the previous step. 🔒 ACS Template Decode Guide The acsTemplate is a Base64-encoded HTML string .
+</body></html> ⚠ Troubleshooting OTP Errors E2502 “Payu unable to parse ACS page for native” — PayU test environment issue. Retry or use a dif
+ancels the hold and releases the funds back to the card. Cancel is only applicable to Authorization requests — any captured transaction can only be refunded. POST https://test.payu.in/merchant/postservice.ph
+response 403993715537230966 var2 Mandatory Merchant unique reference number (token) for this cancel request CANCEL_REF_001 hash Mandatory sha512(key|cancel_transaction|var1|salt) (computed) Mandatory Paramet
+PayU transaction reference ID Cancel Token (var2) * var2 = Merchant unique reference number Preview Request Cancel Transaction Request Sent Copy Response Received Copy cURL Command Copy 6 Capture Transaction
+eration 403993715537230966 var2 Mandatory Merchant unique reference number (token) for this capture request CAPTURE_REF_001 var3 Mandatory Amount to capture — must be ≤ authorized amount. Partial capture is 
+ion|var1|salt) (computed) Response: On success, the response contains "status": 1 , "msg": "Capture Request Queued" , a request_id , and bank_ref_num . Always verify the final status using verify_payment aft
+s Merchant Key * Merchant Salt * PayU ID (mihpayid) * var1 = PayU's transaction reference ID Unique Request ID * var2 = Unique identifier for this capture request Capture Amount * var3 = Amount to capture (c
+ auth with cancellation reflected ⏳ Note: Capture takes ~1 minute to process PayU processes capture requests via a background cron that runs every ~1 minute . After clicking “Verify Final Status”, if the sta
+ally retry every 10 seconds (up to ~80 seconds) until the status changes to captured . Final Verify Request Merchant Key * Merchant Salt * Transaction ID (txnid) * Preview Request Verify Final Status Request
+eation. Model 2: Zero Code Change Just add store_card=1 & user_credentials to your existing payment request. PayU tokenizes automatically. Model 3: REST API Integration Full control with save_payment_instrum
+entation 🔗 Zero Code Change for Vault Integration (Model 2) How it works PayU is onboarded as token requestor. You pass consent ( store_card=1 ) and a user ID ( user_credentials ) during payment. PayU proces
+tication JPg****f command Mandatory getBinInfo — fixed value for this API getBinInfo var1 Mandatory Request type: 1 = single BIN lookup, 2 = feature-based BIN list, 3 = all BINs 1 var2 Conditional If var1=1:
+ch Query 3 1 100 0 Get 100 cards at once Mandatory Parameters Merchant Key * Merchant Salt * var1 – Request Type * 1 = Single BIN lookup var2 – BIN / Feature Code BIN number (first 6–9 digits) for single loo
+ 100) var5 – Enhanced Features 0 – Standard response 1 – Include zero redirect & SI support Preview Request Get BIN Info Request Sent Copy Response Received Copy cURL Command Copy Response Parameters — Use i
+* User Credentials (var1) * Format: merchantKey:userId — e.g. a4vGC2:test_customer1 Get Saved Cards Request Sent Copy Response Received Copy Note: If no cards have been saved for this user, the API returns {
+nt , you must generate a SHA-512 hash . This hash ensures that no one has tampered with the payment request parameters. The hash formula is the same for both first-time and repeat customers. Hash Formula for
+t to save card User Credentials * Format: merchantKey:uniqueUserId Optional Parameters (included in request only if filled) Address Line 1 Address Line 2 City State Country Zipcode UDF1 UDF2 UDF3 UDF4 UDF5 P
+review Request Send Payment Request Sent Copy Response Received Copy cURL Command Copy Response: On success, PayU returns cardToken in 
+url) * Client IP (s2s_client_ip) * Device Info (s2s_device_info) * Optional Parameters (included in request only if filled) Address Line 1 Address Line 2 City State Country Zipcode UDF1 UDF2 UDF3 UDF4 UDF5 P
+review Request Send Token Payment Request Sent Copy Response Received Copy cURL Command Copy 6 Handle 3DS Authentication / Submit OTP After t
+d acsTemplate . Customer completes OTP on bank site. ⏳ Waiting for payment response… Send a payment request in the previous step. The authentication options will appear here automatically. ① Native OTP — Sub
+lback page. ⚠ No ACS template received yet. This will load automatically after you send the payment request in the previous step. 🔒 ACS Template Decode Guide The acsTemplate is a Base64-encoded HTML string .
+tication JPg****f command Mandatory getBinInfo — fixed value for this API getBinInfo var1 Mandatory Request type: 1 = single BIN lookup, 2 = feature-based BIN list, 3 = all BINs 1 var2 Conditional If var1=1:
+h Query 3 1 100 0 Get 100 cards at once Try It – Get BIN Info Merchant Key * Merchant Salt * var1 – Request Type * 1 = Single BIN lookup var2 – BIN / Feature Code BIN number (first 6–9 digits) for single loo
+ 100) var5 – Enhanced Features 0 – Standard response 1 – Include zero redirect & SI support Preview Request Get BIN Info Request Sent Copy Response Received Copy cURL Command Copy Response Parameters — Use i
+als (var1) * Format: merchantKey:userId — must match what was used during card save Get Saved Cards Request Sent Copy Response Received Copy cURL Command Copy Note: If no cards have been saved for this user,
+, retrieve the cryptogram (TAVV) needed for authentication. Call get_payment_details with var3=1 to request cryptogram. POST https://test.payu.in/merchant/postservice.php?form=2 Content-Type: application/x-w
+nal) Not specified (default) NETWORK PAYU Token type for cryptogram: NETWORK or PAYU Get Cryptogram Request Sent Copy Response Received Copy 5 Get User Cards API PayU Token only Retrieve all saved (tokenized
+als (var1) * Format: merchantKey:userId — must match what was used during card save Get Saved Cards Request Sent Copy Response Received Copy Next: Initiate Payment → Payment: First-Time or Repeat with Token 
+nt , you must generate a SHA-512 hash . This hash ensures that no one has tampered with the payment request parameters. The hash formula is the same for all three token types (PayU Token, Network Token, Issu
+url) * Client IP (s2s_client_ip) * Device Info (s2s_device_info) * Optional Parameters (included in request only if filled) Address Line 1 Address Line 2 City State Country Zipcode UDF1 UDF2 UDF3 UDF4 UDF5 P
+review Request Send Payment Request Sent Copy Response Received Copy cURL Command Copy 7 Payment API — Repeat with PayU Token Send the 
+L (surl) * Failure URL (furl) * Client IP (s2s_client_ip) * Device Info (s2s_device_info) * Preview Request Send Token Payment Request Sent Copy Response Received Copy cURL Command Copy 8 Payment API — Repea
+ccexpmon) Token Expiry Year (ccexpyr) Last 4 Digits (original card) TAVV / Cryptogram * TRID (Token Requestor ID) Token Reference No Issuer Token (storecard_token_type=2): Used when the card is a Diners (DIN
+yptogram response tokenBank * Issuing bank name (e.g. HDFC, ICICI) Optional Parameters (included in request only if filled) Address Line 1 Address Line 2 City State Country Zipcode UDF1 UDF2 UDF3 UDF4 UDF5 P
+review Request Send Token Payment Request Sent Copy Response Received Copy cURL Command Copy 9 Handle 3DS Authentication / Submit OTP After t
+d acsTemplate . Customer completes OTP on bank site. ⏳ Waiting for payment response… Send a payment request in the previous step. The authentication options will appear here automatically. ① Native OTP — Sub
+lback page. ⚠ No ACS template received yet. This will load automatically after you send the payment request in the previous step. 🔒 ACS Template Decode Guide The acsTemplate is a Base64-encoded HTML string .
+8) * AFA Consent (var10) true false Tokenization Consent (var11) true false Save Payment Instrument Request Sent Copy Response Received Copy PCI-DSS Compliance Required You must be PCI-DSS compliant to use M
+lt.acsTemplate 3 Encoding Base64 string How 3DS Redirect Works ① Payment API Call You send _payment request with card details. PayU processes and returns response with acsTemplate . ② Decode Base64 The acsTe
+k redirects to your surl (success) or furl (failure). Ensure these are set correctly in the payment request. pureS2SSupported — If binData.pureS2SSupported = true , you can also use the Native OTP method (Su
+ed by PayU during onboarding a4vGC2 salt Mandatory Merchant salt for hash generation (never sent in request) hKvGJP28d2... txnid Mandatory Unique transaction ID (max 25 chars) NB_unique123 amount Mandatory T
+  // Send _payment request with the selected bank...
+ctinfo|firstname|email|udf1|udf2|udf3|udf4|udf5||||||salt) 4 POST to PayU _payment API Send payment request with pg=NB , bankcode , and txn_s2s_flow=4 for JSON response. 5 Decode acsTemplate & redirect Base6
+ed by PayU during onboarding a4vGC2 salt Mandatory Merchant salt for hash generation (never sent in request) hKvGJP28d2... txnid Mandatory Unique transaction ID (max 25 chars) NB_1234567890 amount Mandatory 
+} Try It — Send Real Request Merchant Key * Merchant Salt * Transaction ID (txnid) * Get Txn ID Amount * Product Info * Bank Cod
+ (s2s_device_info) User Defined Fields Optional udf1 udf2 udf3 udf4 udf5 ⚡ Fill Sample Data Preview Request Send to PayU → Request Sent Copy Response Received Copy Understanding the Response 🏦 Open Bank Page
+oint: POST https://test.payu.in/_payment (Test) | POST https://secure.payu.in/_payment (Production) Request Parameters Parameter Required Description Example key Mandatory String — Merchant key provided by P
+U during onboarding a4vGC2 salt Mandatory String — Merchant salt for hash generation (never sent in request) hKvGJP28d2... txnid Mandatory String — Unique transaction ID (max 25 chars) NB_1234567890 amount M
+      "error": "E000",
+      "error_Message": "No Error"
+} Try It — Send Real Request Merchant Key * Merchant Salt * Transaction ID * Preview Request Send to PayU → Request Sent Copy Response Received Copy Understanding the Response cURL Command Cop
+e transaction ID from the payment response ✓ Unique Token ID Your unique identifier for this refund request API Reference Endpoint: POST https://test.payu.in/merchant/postservice.php?form=2 Parameter Require
+  "msg": "Refund Request Queued",
+  "request_id": "10825083",
+track refund status Partial refunds are supported - specify the amount in var3 Try It — Send Refund Request Merchant Key * Merchant Salt * PayU Transaction ID (mihpayid) * Unique Refund Token ID * Refund Amo
+unt * ⚡ Fill Sample Data Preview Request Send Refund Request → Request Sent Copy Response Received Copy cURL Command Copy Check Refund Status After initiating a refund, u
+se check_action_status to track its progress. Merchant Key * Merchant Salt * Request ID (from refund response) * Preview Request Check Status → Request Sent Copy Response Received Copy
+  "msg": "Refund Request Queued",
+  "request_id": "10825084",
+ortional refund Use check_action_status API to track split refund status Try It — Send Split Refund Request Merchant Key * Merchant Salt * PayU Transaction ID (mihpayid) * Unique Refund Token ID * Total Refu
+nd Amount * Split Refund Details (JSON) * ⚡ Fill Sample Data Preview Request Send Split Refund → Request Sent Copy Response Received Copy cURL Command Copy Next: Settlement → Step 1: Net Banking TPV (Thir
+ed by PayU during onboarding a4vGC2 salt Mandatory Merchant salt for hash generation (never sent in request) hKvGJP28d2... txnid Mandatory Unique transaction ID TPV_123456 amount Mandatory Transaction amount
+Options (Loading...) Only showing TPV-enabled banks. Use the ibibo_code as bankcode in your payment request. ibibo_code Bank Name Status Action AXNBTPV Axis Bank TPV ▲ Up Use This Bank HABOROTPV Bank of Baro
+s2s_device_info) * User Defined Fields Optional udf1 udf2 udf3 udf4 udf5 ⚡ Fill Sample Data Preview Request Send TPV Payment → Request Sent Copy Response Received Copy Understanding the Response 🏦 Open Bank 
+oint: POST https://test.payu.in/_payment (Test) | POST https://secure.payu.in/_payment (Production) Request Parameters Parameter Required Description Example key Mandatory String — Merchant key provided by P
+U during onboarding a4vGC2 salt Mandatory String — Merchant salt for hash generation (never sent in request) hKvGJP28d2... txnid Mandatory String — Unique transaction ID TPV_123456 amount Mandatory String — 
+ing onboarding a4vGC2 salt Mandatory String — Merchant salt used for hash generation (never sent in request) mGHSxpD2iB... command Mandatory String — API command — fixed verify_payment verify_payment var1 Ma
+rchantSalt) Try It — Verify TPV Transaction Merchant Key * Merchant Salt * Transaction ID * Preview Request Verify Payment → Request Sent Copy Response Received Copy Understanding the Response cURL Command C
+ed by PayU during onboarding a4vGC2 salt Mandatory Merchant salt for hash generation (never sent in request) hKvGJP28d2... txnid Mandatory Unique transaction ID PACB_123456 amount Mandatory Amount to pre-aut
+mber (MANDATORY for LRS S2S) 0 /255 LRS S2S: Must be buyer's PAN. Digital/Physical: Send if AD bank requests. UDF2 - Free Use (STATIC/SKIP) 0 /255 No regulatory purpose. Can be used freely or sent empty. UDF
+e full PACB flow without PayU activation. Uses realistic mock responses. ⚡ Fill Sample Data Preview Request Send Pre-Auth Request → Request Sent Copy Response Received Copy Understanding the Response 🏦 Open 
+tion var1 Mandatory PayU transaction ID (mihpayid) 403993715537135556 var2 Mandatory Unique capture request ID CAP_123456 var3 Mandatory Amount to capture (can be partial) 500.00 hash Mandatory SHA-512 hash 
+hout real API call. Merchant Key * Merchant Salt * PayU ID (mihpayid) * Amount to Capture * Preview Request Capture Funds → Request Sent Copy Response Received Copy Understanding the Response cURL Command Co
+RL (Failure URL) * User Defined Fields Optional udf1 udf2 udf3 udf4 udf5 ⚡ Fill Sample Data Preview Request Send to PayU → Request Sent Copy Response Received Copy cURL Command Copy ✓ Mandate Initiated — acs
+ing onboarding a4vGC2 salt Mandatory String — Merchant salt used for hash generation (never sent in request) mGHSxpD2iB... command Mandatory String — API command — fixed verify_payment verify_payment var1 Ma
+registration and get the mihpayid . Merchant Key * Merchant Salt * Transaction ID (txnid) * Preview Request Verify Mandate → Request Sent Copy Response Received Copy cURL Command Copy ✓ Mandate Verified - au
+d NB_mandate_status NB_mandate_status var1 Mandatory String — JSON string containing authpayuid and requestId (see var1 breakdown below) (see below) hash Mandatory String — SHA-512 hash — sha512(key|NB_manda
+ory String — The mihpayid received from mandate registration (Step 2 — Handle Response) 10731087875 requestId Mandatory String — A unique request identifier for this status check call 1892432156 Response Par
+ debit execution. Prerequisites ✓ authpayuid (mihpayid) from mandate registration response ✓ Unique requestId for this status check Hash Formula NB_mandate_status Hash Copy sha512(key|command|var1|salt)
+sha512(merchantKey|NB_mandate_status|{"authpayuid":"...","requestId":"..."}|merchantSalt) API Request Format NB_mandate_status Request Copy // Endpoint: https://test.payu.in/merchant/postservice.php?fo
+  "var1": "{\"authpayuid\":\"10731087875\",\"requestId\":\"1892432156\"}",
+ate is active and ready for debits FAILED Mandate registration failed CANCEL_INITIATED Cancellation request initiated CANCEL_PENDING Cancellation pending at bank CANCEL_SUCCESS Mandate successfully cancelled
+ CANCEL_FAILED Cancellation request failed Try It — Check Mandate Status Merchant Key * Merchant Salt * Auth PayU ID (mihpayid) * Reque
+st ID * ⚡ Fill Sample Data Preview Request Check Status → Request Sent Copy Response Received Copy cURL Command Copy Next: Step 4 - Execute Debit → Step 4: Execute R
+date registration. This is a PayU policy to allow mandate activation and bank confirmation. Preview Request Execute Debit → Request Sent Copy Response Received Copy cURL Command Copy ⚠ Important Notes Debit 
+ould be retried after 24-48 hours Maintain debit history for reconciliation 🔎 Troubleshooting "Some error occurred" Invalid authpayuid: The mihpayid must be from a successful mandate registration Mandate n
+] Try It — Send Real Request 💡 Quick Start: Click "Fetch All Active Banks" to get the complete list of available Net Banking opt
+t account. Merchant Key * Merchant Salt * Bank Code (var1) 🏦 Fetch All Banks (var1=default) Preview Request Check Specific Bank → Request Sent Copy Response Received Copy cURL Command Copy 🏦 Net Banking Opti
+ons Only showing mode: "NB" options. Use the ibibo_code as bankcode in your payment request. ibibo_code title up_status Action Next: Initiate Payment → NB Split Payment Overview Split Payment
+abled on merchant account ✓ Child merchant IDs configured ✓ Split configuration JSON prepared Split Request JSON Structure split_request Parameter Copy {
+} Hash Formula (with split_request) Copy sha512(key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5||||||salt|split_
+request_json) 💡 Split Payment Use Cases Marketplaces: Split between platform and sellers Aggregators: Distr
+} Apply Offer in Payment Payment with Offer Copy // Add these parameters to _payment request:
+Distributed as per split config Next: Bank Codes Reference → Hash Generator Overview Every PayU API request requires a SHA-512 hash for authentication. The hash proves the request came from you and hasn't be
+ → 2 Hash Formula Pipe-separated → 3 SHA-512 Hash algorithm → 4 Hex String Lowercase output → 5 API Request Include hash Step-by-Step Guide 1 Identify the hash formula for your API Each PayU API uses a diffe
+d convert the result to a lowercase hexadecimal string (128 characters). 4 Include hash in your API request Add the computed hash as the hash parameter in your API request. PayU will independently compute th
+e same hash and reject the request if they don't match. Hash Formulas by API API Hash Formula Payment sha512(key|txnid|amount|producti
+Prerequisite for NB section to try it live. Example Usage Copy // Use bankcode in your _payment API request

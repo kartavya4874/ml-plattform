@@ -238,32 +238,14 @@ export default function PricingPage() {
             setPhoneError('Please enter a valid 10-digit mobile number');
             return;
         }
-        setPhoneDialog({ open: false, tier: '' });
         
         // Show loading backdrop
         setCheckoutParams({ loading: true }); 
 
         try {
             const { data } = await api.get(`/subscription/payu/checkout-params?tier=${phoneDialog.tier}&phone=${cleaned}`);
-            
-            // Programmatically construct and fire form to prevent React lifecycle double-POSTs
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = data.actionUrl;
-            form.style.display = 'none';
-            
-            Object.keys(data).forEach(key => {
-                if (key !== 'actionUrl' && data[key] !== null) {
-                    const hiddenField = document.createElement('input');
-                    hiddenField.type = 'hidden';
-                    hiddenField.name = key;
-                    hiddenField.value = data[key];
-                    form.appendChild(hiddenField);
-                }
-            });
-            
-            document.body.appendChild(form);
-            form.submit();
+            setPhoneDialog({ open: false, tier: '' });
+            setCheckoutParams(data); // Save params instead of programmatic submit
         } catch (e: any) {
             setCheckoutParams(null);
             alert(e.response?.data?.detail || "Failed to initiate payment gateway");
@@ -305,9 +287,49 @@ export default function PricingPage() {
 
             {/* PayU Overlay */}
             {checkoutParams && (
-                <Backdrop open={true} sx={{ zIndex: 9999, flexDirection: 'column', color: '#fff' }}>
-                    <CircularProgress color="inherit" sx={{ mb: 2 }} />
-                    <Typography variant="h6" fontWeight={600}>Redirecting to PayU Secure Gateway...</Typography>
+                <Backdrop open={true} sx={{ zIndex: 9999, flexDirection: 'column', color: '#fff', bgcolor: 'rgba(0,0,0,0.85)' }}>
+                    {checkoutParams.loading ? (
+                        <>
+                            <CircularProgress color="inherit" sx={{ mb: 2 }} />
+                            <Typography variant="h6" fontWeight={600}>Preparing Secure Gateway...</Typography>
+                        </>
+                    ) : (
+                        <Box sx={{ textAlign: 'center', p: 4, bgcolor: '#111', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                            <RocketIcon sx={{ fontSize: 48, color: '#10B981', mb: 2 }} />
+                            <Typography variant="h5" fontWeight={700} sx={{ mb: 1 }}>Ready for Checkout</Typography>
+                            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 4, maxWidth: 300 }}>
+                                You are being redirected to PayU's secure payment environment.
+                            </Typography>
+                            
+                            <form action={checkoutParams.actionUrl} method="POST">
+                                {Object.keys(checkoutParams).map(key => {
+                                    if (key !== 'actionUrl' && key !== 'loading' && checkoutParams[key] !== null) {
+                                        return <input key={key} type="hidden" name={key} value={checkoutParams[key]} />
+                                    }
+                                    return null;
+                                })}
+                                <Button 
+                                    type="submit" 
+                                    variant="contained" 
+                                    fullWidth
+                                    sx={{ 
+                                        py: 1.5, 
+                                        fontWeight: 700,
+                                        background: 'linear-gradient(135deg, #10B981, #059669)',
+                                        '&:hover': { background: 'linear-gradient(135deg, #34D399, #10B981)' }
+                                    }}
+                                >
+                                    Continue to Secure Payment
+                                </Button>
+                                <Button 
+                                    onClick={() => setCheckoutParams(null)} 
+                                    sx={{ mt: 2, color: 'text.secondary' }}
+                                >
+                                    Cancel
+                                </Button>
+                            </form>
+                        </Box>
+                    )}
                 </Backdrop>
             )}
 
