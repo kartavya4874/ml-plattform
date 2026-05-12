@@ -148,7 +148,7 @@ export default function ContactUsPage() {
                         Have a question, feedback, or need help? We'd love to hear from you. Our team typically responds within 24–48 hours.
                     </Typography>
                     <Typography variant="body1" sx={{ color: theme.palette.text.secondary, mt: 2 }}>
-                        Built by <strong style={{ color: theme.palette.text.primary }}>Kartavya Baluja</strong> — Founder, Parametrix AI
+                        Built by <strong style={{ color: theme.palette.text.primary }}>Parametrix Team</strong> — Founders, Parametrix AI
                     </Typography>
                 </Box>
 
@@ -271,7 +271,7 @@ export default function ContactUsPage() {
                     © {new Date().getFullYear()} {COMPANY_NAME}. All rights reserved.
                 </Typography>
                 <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                    Founded by <strong>Kartavya Baluja</strong>
+                    Founded by <strong>Parametrix Team</strong>
                 </Typography>
             </Box>
 

@@ -281,7 +281,7 @@ export default function Layout() {
                         </Tooltip>
                     </Box>
                     <Typography variant="caption" sx={{ display: 'block', mt: 2, textAlign: 'center', color: 'text.secondary', fontSize: '10px', opacity: 0.6 }}>
-                        Made with ❤️ by Kartavya & Maninder
+                        Made with ❤️ by Parametrix Team
                     </Typography>
                 </Box>
             </Drawer>
